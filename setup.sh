@@ -1,4 +1,4 @@
-export ZONING_DB_PATH=database.db
+export ZONING_DB_PATH="database.db"
 
 if [ ! -f $ZONING_DB_PATH ]
 then
@@ -7,4 +7,4 @@ then
 fi
 
 source bin/activate
-pip install -r requirements.txt
+# pip install -r requirements.txt

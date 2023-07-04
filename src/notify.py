@@ -3,8 +3,9 @@ import logging
 import os
 # import re
 import sqlite3
-import yagmail
 # from collections import namedtuple
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
 from typing import Dict, Iterable #, Optional
 
 
@@ -23,7 +24,7 @@ from typing import Dict, Iterable #, Optional
 
 def notify_meetings() -> None:
     logging.info('Looking up un-notified meetings')
-    with sqlite3.connect(os.env['ZONING_DB_PATH']) as conn:
+    with sqlite3.connect(os.environ['ZONING_DB_PATH']) as conn:
         meetings = conn.execute('''
             SELECT
                 m.id,
@@ -38,24 +39,26 @@ def notify_meetings() -> None:
         ''').fetchall()
 
     logging.info(f'Found {len(meetings)} un-notified meeting(s)')
+    email_client = SendGridAPIClient(os.environ['SENDGRID_API_KEY'])
     successes = []
     failures = []
 
-    with yagmail.SMTP('nyczoningnotifications@gmail.com', os.env['ZONING_EMAIL_PW']) as yag:
-        for meeting_id, when, projects in meetings:
-            try:
-                # TODO: bcc saved recipients
-                yag.send('dccohe@gmail.com',
-                         f'Public meeting at {when}',
-                         to_html(json.loads(projects)))
-                logging.info(f'Sent email for meeting_id {meeting_id}')
-                successes.append(meeting_id)
-            except:
-                logging.exception(f'Failed to send email for meeting_id {meeting_id}')
-                failures.append(meeting_id)
+    for meeting_id, when, projects in meetings:
+        try:
+            # TODO: bcc saved recipients
+            response = email_client.send(
+                Mail(from_email='nyczoningnotifications@gmail.com',
+                     to_emails='dccohe@gmail.com',
+                     subject=f'Public meeting at {when}',
+                     html_content=to_html(json.loads(projects))))
+            logging.info(f'Sent email for meeting_id {meeting_id}: {response.status_code}')
+            successes.append(meeting_id)
+        except:
+            logging.exception(f'Failed to send email for meeting_id {meeting_id}')
+            failures.append(meeting_id)
 
     logging.info(f'Setting notified to true for meeting_ids {successes}')
-    with sqlite3.connect(os.env['ZONING_DB_PATH']) as conn:
+    with sqlite3.connect(os.environ['ZONING_DB_PATH']) as conn:
         conn.execute(f'''
             UPDATE meetings
             SET notified = true
@@ -63,10 +66,13 @@ def notify_meetings() -> None:
         ''', successes)
 
     logging.info('Sending admin email')
-    with yagmail.SMTP('nyczoningnotifications@gmail.com', 'kdxssmyrmcbpifsm') as yag:
-        yag.send('dccohe@gmail.com',
-                 'nyczoning report',
-                 f'Successful meeting_ids: {successes}\nFailed meeting_ids: {failures}')
+    response = email_client.send(
+        Mail(from_email='nyczoningnotifications@gmail.com',
+             to_emails='dccohe@gmail.com',
+             subject='nyczoning report',
+             html_content=f'Successful meeting_ids: {successes}\nFailed meeting_ids: {failures}'))
+    logging.info(f'Sent admin email: {response.status_code}')
+
 
 # TODO: prettify email
 def to_html(projects: Iterable[Dict[str, str]]) -> str:

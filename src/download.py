@@ -17,6 +17,11 @@ def download_pdfs() -> None:
     logging.info('Parsing HTML')
     soup = bs4.BeautifulSoup(resp.text, features='lxml')
 
+    with sqlite3.connect(os.environ['ZONING_DB_PATH']) as conn:
+        meetings_iso = {
+            when for when, in conn.execute('SELECT datetime FROM meetings').fetchall()
+        }
+
     for section in soup.find_all('div', class_='section'):
         title = section.find(class_='section-title').text
         logging.info(f'Found section "{title}"')
@@ -30,7 +35,11 @@ def download_pdfs() -> None:
             )
             date_text = section.find(id='PMDATE').find(text=True, recursive=False).strip()
             when = dt.datetime.strptime(date_text, '%A, %B %d, %Y, %I:%M %p')
-            download_meeting_pdf(pdf_url, when)
+
+            if when.isoformat(sep=' ') in meetings_iso:
+                logging.info(f'Skipping {when} because it is already in db')
+            else:
+                download_meeting_pdf(pdf_url, when)
 
 
 def download_meeting_pdf(pdf_url: str, when: dt.datetime) -> None:
@@ -45,7 +54,7 @@ def download_meeting_pdf(pdf_url: str, when: dt.datetime) -> None:
     with open(filename, 'wb') as f:
         f.write(pdf_bytes)
 
-    with sqlite3.connect(os.env['ZONING_DB_PATH']) as conn:
+    with sqlite3.connect(os.environ['ZONING_DB_PATH']) as conn:
         db_row = when_iso, filename, pdf_url
         logging.info(f'Inserting into database: {db_row}')
         cur = conn.cursor()

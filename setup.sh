@@ -1,4 +1,4 @@
-export ZONING_DB_PATH=db/database.db
+export ZONING_DB_PATH=database.db
 
 if [ ! -f $ZONING_DB_PATH ]
 then

@@ -1,4 +1,5 @@
 beautifulsoup4==4.8.2
+pycryptodome==3.18.0
 pypdf==3.12.0
 requests==2.31.0
 tabula-py==2.6.0

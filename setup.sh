@@ -1,4 +1,8 @@
-export ZONING_DB_PATH="database.db"
+if [ -z $ZONING_DB_PATH ]
+then
+    echo 'Must specify $ZONING_DB_PATH'
+    kill -INT $$
+fi
 
 if [ ! -f $ZONING_DB_PATH ]
 then

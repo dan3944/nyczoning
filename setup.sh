@@ -10,6 +10,4 @@ then
     cat src/schema.sql | sqlite3 $ZONING_DB_PATH
 fi
 
-python -m venv .
-source bin/activate
-pip install -r requirements.txt
+pip3 install -r requirements.txt

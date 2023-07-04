@@ -1,0 +1,8 @@
+__pycache__
+bin
+env.sh
+include
+lib
+lib64
+pdfs
+pyvenv.cfg

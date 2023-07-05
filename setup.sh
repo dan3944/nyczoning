@@ -4,10 +4,5 @@ then
     kill -INT $$
 fi
 
-if [ ! -f $ZONING_DB_PATH ]
-then
-    echo "creating $ZONING_DB_PATH"
-    cat src/schema.sql | sqlite3 $ZONING_DB_PATH
-fi
-
+cat src/schema.sql | sqlite3 $ZONING_DB_PATH
 pip3 install -r requirements.txt

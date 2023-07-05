@@ -49,7 +49,7 @@ def notify_meetings() -> None:
             response = email_client.send(
                 Mail(from_email='nyczoningnotifications@gmail.com',
                      to_emails='dccohe@gmail.com',
-                     subject=f'Public meeting at {when}',
+                     subject=f'NYC zoning meeting happening on {when}',
                      html_content=to_html(json.loads(projects))))
             logging.info(f'Sent email for meeting_id {meeting_id}: {response.status_code}')
             successes.append(meeting_id)

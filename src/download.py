@@ -13,7 +13,7 @@ from urllib.parse import urlparse
 def download_pdfs() -> None:
     url = 'https://www.nyc.gov/site/planning/about/commission-meetings.page'
     logging.info(f'Getting links from {url}')
-    resp = requests.get('https://www.nyc.gov/site/planning/about/commission-meetings.page')
+    resp = requests.get(url)
     logging.info('Parsing HTML')
     soup = bs4.BeautifulSoup(resp.text, features='lxml')
 

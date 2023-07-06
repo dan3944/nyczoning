@@ -74,8 +74,6 @@ def download_meeting_pdf(pdf_url: str, when: dt.datetime) -> None:
             .dropna() \
             .set_axis(['ulurp_number', 'description', 'location'], axis=1) \
             .assign(meeting_id=cur.lastrowid)
-            # .applymap(lambda text: '\n'.join(text.splitlines())) \
-            # .applymap(lambda text: ' '.join(text.split())) \
     
         logging.info(f'Inserting into database:\n{df}')
         df.to_sql('projects', conn, index=False, if_exists='append')

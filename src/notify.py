@@ -38,6 +38,14 @@ def notify_meetings() -> None:
             GROUP BY 1, 2
         ''').fetchall()
 
+    try:
+        with open('recipients.txt') as f:
+            recipients = f.read().split()
+        logging.info(f'recipients: {recipients}')
+    except:
+        logging.exception('Failed to read recipients.txt')
+        raise
+
     logging.info(f'Found {len(meetings)} un-notified meeting(s)')
     email_client = SendGridAPIClient(os.environ['SENDGRID_API_KEY'])
     successes = []
@@ -45,12 +53,12 @@ def notify_meetings() -> None:
 
     for meeting_id, when, projects in meetings:
         try:
-            # TODO: bcc saved recipients
-            response = email_client.send(
-                Mail(from_email='nyczoningnotifications@gmail.com',
-                     to_emails='dccohe@gmail.com',
-                     subject=f'NYC zoning meeting happening on {when}',
-                     html_content=to_html(json.loads(projects))))
+            mail = Mail(from_email='nyczoningnotifications@gmail.com',
+                        to_emails='nyczoningnotifications@gmail.com',
+                        subject=f'NYC zoning meeting happening on {when}',
+                        html_content=to_html(json.loads(projects)))
+            mail.bcc = recipients
+            response = email_client.send(mail)
             logging.info(f'Sent email for meeting_id {meeting_id}: {response.status_code}')
             successes.append(meeting_id)
         except:

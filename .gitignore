@@ -7,4 +7,5 @@ lib
 lib64
 pdfs
 pyvenv.cfg
+recipients.txt
 sendgrid.env

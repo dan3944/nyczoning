@@ -1,25 +1,13 @@
 import json
 import logging
 import os
-# import re
+import re
 import sqlite3
-# from collections import namedtuple
+import yattag
+from collections import namedtuple
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
-from typing import Dict, Iterable #, Optional
-
-
-# Location = namedtuple('Location', ['cd', 'nhood', 'borough', 'cm', 'district'])
-# boroughs = '|'.join(['Brooklyn', 'Manhattan', 'Queens', 'Staten Island', 'The Bronx'])
-# location_pattern = re.compile(
-#     rf'Community District (\d+) (.*[^,]),? ({boroughs}) Councilmember (.+[^,]),? District (\d+)',
-#     flags=re.IGNORECASE)
-
-# def parse_location(text: str) -> Optional[Location]:
-#     parsed = re.fullmatch(location_pattern, text)
-#     if parsed:
-#         cd_num, nhood, borough, cm, district = parsed.groups()
-#         return Location(int(cd_num), nhood, borough, cm, int(district))
+from typing import Dict, Iterable, Optional
 
 
 def notify_meetings() -> None:
@@ -38,13 +26,9 @@ def notify_meetings() -> None:
             GROUP BY 1, 2
         ''').fetchall()
 
-    try:
-        with open('recipients.txt') as f:
-            recipients = f.read().split()
+    with open('recipients.txt') as f:
+        recipients = f.read().split()
         logging.info(f'recipients: {recipients}')
-    except:
-        logging.exception('Failed to read recipients.txt')
-        raise
 
     logging.info(f'Found {len(meetings)} un-notified meeting(s)')
     email_client = SendGridAPIClient(os.environ['SENDGRID_API_KEY'])
@@ -82,17 +66,59 @@ def notify_meetings() -> None:
     logging.info(f'Sent admin email: {response.status_code}')
 
 
-# TODO: prettify email
 def to_html(projects: Iterable[Dict[str, str]]) -> str:
-    def to_html_row(project):
-        return '<tr><td>{description}</td><td>{location}</td></tr>'.format(**project)
+    table_style = css({'border-collapse': 'collapse',
+                       'border': '1px solid black',
+                       'table-layout': 'fixed',
+                       'font-family': 'sans-serif'})
+    header_style = css({'padding': '16px 8px',
+                       'font-size': '14pt',
+                       'border': '1px solid black'})
+    cell_style = lambda width: css({
+        'padding': '16px 8px',
+        'font-size': '11pt',
+        'width': f'{width}%',
+        'border': '1px solid black'})
+    doc, tag, text = yattag.Doc().tagtext()
 
-    return f'''
-        <table>
-            <tr><th>Name and description</th><th>Location</th></tr>
-            {"".join(map(to_html_row, projects))}
-        </table>
-    '''
+    with tag('table', table_style):
+        with tag('tr'):
+            for header in ('Name and description', 'Location', 'Councilmember'):
+                with tag('th', header_style):
+                    text(header)
+
+        for project in projects:
+            location = parse_location(project['location'])
+            with tag('tr'):
+                with tag('td', cell_style(50)):
+                    text(project['description'])
+                with tag('td', cell_style(25)):
+                    text(f'{location.borough} - {location.nhood} (Community District {location.cd})'
+                         if location else project['location'])
+                with tag('td', cell_style(25)):
+                    text(f'{location.cm} (District {location.district})'
+                         if location else '')
+
+    return doc.getvalue()
+
+
+def css(styles):
+    return ('style',
+            ' '.join(f'{key}: {val};' for key, val in styles.items()))
+
+
+Location = namedtuple('Location', ['cd', 'nhood', 'borough', 'cm', 'district'])
+boroughs = '|'.join(['Brooklyn', 'Manhattan', 'Queens', 'Staten Island', 'The Bronx'])
+location_pattern = re.compile(
+    rf'Community District (\d+) (.*[^,]),? ({boroughs}) Councilmember (.+[^,]),? District (\d+)',
+    flags=re.IGNORECASE)
+
+
+def parse_location(text: str) -> Optional[Location]:
+    parsed = re.fullmatch(location_pattern, ' '.join(text.split()))
+    if parsed:
+        cd_num, nhood, borough, cm, district = parsed.groups()
+        return Location(int(cd_num), nhood, borough, cm, int(district))
 
 
 if __name__ == '__main__':

@@ -7,7 +7,7 @@ import yattag
 from collections import namedtuple
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
-from typing import Dict, Iterable, Optional
+from typing import Dict, Iterable, Optional, Tuple
 
 
 def notify_meetings() -> None:
@@ -102,9 +102,8 @@ def to_html(projects: Iterable[Dict[str, str]]) -> str:
     return doc.getvalue()
 
 
-def css(styles):
-    return ('style',
-            ' '.join(f'{key}: {val};' for key, val in styles.items()))
+def css(styles: Dict[str, str]) -> Tuple[str, str]:
+    return ('style', ' '.join(f'{key}: {val};' for key, val in styles.items()))
 
 
 Location = namedtuple('Location', ['cd', 'nhood', 'borough', 'cm', 'district'])

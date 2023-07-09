@@ -1,14 +1,16 @@
+import datetime as dt
 import json
 import logging
 import os
 import re
 import sqlite3
 import yattag
-from collections import namedtuple
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
-from typing import Dict, Iterable, Optional, Tuple
+from typing import Dict, Iterable, Tuple
 
+FROM_EMAIL = 'nyczoningnotifications@gmail.com'
+DATETIME_FORMAT = '%A, %B %-d at %-I:%M %p'
 
 def notify_meetings() -> None:
     logging.info('Looking up un-notified meetings')
@@ -17,6 +19,7 @@ def notify_meetings() -> None:
             SELECT
                 m.id,
                 m.datetime,
+                m.pdf_url,
                 json_group_array(
                     json_object('description', p.description, 'location', p.location)
                 ) AS projects
@@ -35,12 +38,13 @@ def notify_meetings() -> None:
     successes = []
     failures = []
 
-    for meeting_id, when, projects in meetings:
+    for meeting_id, when, pdf_url, projects in meetings:
         try:
-            mail = Mail(from_email='nyczoningnotifications@gmail.com',
-                        to_emails='nyczoningnotifications@gmail.com',
-                        subject=f'NYC zoning meeting happening on {when}',
-                        html_content=to_html(json.loads(projects)))
+            when = dt.datetime.fromisoformat(when)
+            mail = Mail(from_email=FROM_EMAIL,
+                        to_emails=FROM_EMAIL,
+                        subject='NYC zoning meeting on {}'.format(when.strftime(DATETIME_FORMAT)),
+                        html_content=to_html(when, pdf_url, json.loads(projects)))
             mail.bcc = recipients
             response = email_client.send(mail)
             logging.info(f'Sent email for meeting_id {meeting_id}: {response.status_code}')
@@ -59,65 +63,72 @@ def notify_meetings() -> None:
 
     logging.info('Sending admin email')
     response = email_client.send(
-        Mail(from_email='nyczoningnotifications@gmail.com',
+        Mail(from_email=FROM_EMAIL,
              to_emails='dccohe@gmail.com',
              subject='nyczoning report',
              html_content=f'Successful meeting_ids: {successes}\nFailed meeting_ids: {failures}'))
     logging.info(f'Sent admin email: {response.status_code}')
 
 
-def to_html(projects: Iterable[Dict[str, str]]) -> str:
-    table_style = css({'border-collapse': 'collapse',
-                       'border': '1px solid black',
-                       'table-layout': 'fixed',
-                       'font-family': 'sans-serif'})
-    header_style = css({'padding': '16px 8px',
-                       'font-size': '14pt',
-                       'border': '1px solid black'})
-    cell_style = lambda width: css({
+def to_html(when: dt.datetime, pdf_url: str, projects: Iterable[Dict[str, str]]) -> str:
+    table_style = style({
+        'border-collapse': 'collapse',
+        'border': '1px solid black',
+        'table-layout': 'fixed'})
+    header_style = style({
+        'font-size': '14pt',
         'padding': '16px 8px',
-        'font-size': '11pt',
-        'width': f'{width}%',
         'border': '1px solid black'})
-    doc, tag, text = yattag.Doc().tagtext()
+    cell_style = lambda width: style({
+        'font-size': '11pt',
+        'padding': '16px 8px',
+        'border': '1px solid black',
+        'width': f'{width}%'})
 
-    with tag('table', table_style):
-        with tag('tr'):
-            for header in ('Name and description', 'Location', 'Councilmember'):
-                with tag('th', header_style):
-                    text(header)
+    doc, tag, text, line = yattag.Doc().ttl()
 
-        for project in projects:
-            location = parse_location(project['location'])
+    with tag('html', style({'font-family': 'sans-serif'})):
+        with tag('table'):
             with tag('tr'):
-                with tag('td', cell_style(50)):
-                    text(project['description'])
-                with tag('td', cell_style(25)):
-                    text(f'{location.borough} - {location.nhood} (Community District {location.cd})'
-                         if location else project['location'])
-                with tag('td', cell_style(25)):
-                    text(f'{location.cm} (District {location.district})'
-                         if location else '')
+                line('td', 'The NYC planning commission will have a public meeting on {}.'.format(when.strftime(DATETIME_FORMAT)))
+            with tag('tr'):
+                line('td', f'The full agenda can be found here: {pdf_url}')
+
+        with tag('table', table_style):
+            with tag('tr'):
+                for header in ('Project name and description', 'Location', 'Councilmember'):
+                    line('th', header, header_style)
+            for project in projects:
+                parsed = Project(project['description'], project['location'])
+                with tag('tr'):
+                    line('td', parsed.description, cell_style(50))
+                    line('td', parsed.location_str, cell_style(25))
+                    line('td', parsed.council_str, cell_style(25))
 
     return doc.getvalue()
 
 
-def css(styles: Dict[str, str]) -> Tuple[str, str]:
+def style(styles: Dict[str, str]) -> Tuple[str, str]:
     return ('style', ' '.join(f'{key}: {val};' for key, val in styles.items()))
 
 
-Location = namedtuple('Location', ['cd', 'nhood', 'borough', 'cm', 'district'])
-boroughs = '|'.join(['Brooklyn', 'Manhattan', 'Queens', 'Staten Island', 'The Bronx'])
-location_pattern = re.compile(
-    rf'Community District (\d+) (.*[^,]),? ({boroughs}) Councilmember (.+[^,]),? District (\d+)',
-    flags=re.IGNORECASE)
+class Project:
+    boroughs = '|'.join(['Brooklyn', 'Manhattan', 'Queens', 'Staten Island', 'The Bronx'])
+    pattern = re.compile(
+        rf'Community District (\d+) (.*[^,]),? ({boroughs}) Councilmember (.+[^,]),? District (\d+)',
+        flags=re.IGNORECASE)
 
+    def __init__(self, description: str, raw_location: str):
+        self.description = description
+        parsed_location = re.fullmatch(Project.pattern, ' '.join(raw_location.split()))
 
-def parse_location(text: str) -> Optional[Location]:
-    parsed = re.fullmatch(location_pattern, ' '.join(text.split()))
-    if parsed:
-        cd_num, nhood, borough, cm, district = parsed.groups()
-        return Location(int(cd_num), nhood, borough, cm, int(district))
+        if parsed_location is not None:
+            cd, nhood, borough, cm, district = parsed_location.groups()
+            self.location_str = f'{borough} - {nhood} (Community District {cd})'
+            self.council_str = f'{cm} (District {district})'
+        else:
+            self.location_str = raw_location
+            self.council_str = ''
 
 
 if __name__ == '__main__':

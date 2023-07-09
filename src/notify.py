@@ -89,10 +89,11 @@ def to_html(when: dt.datetime, pdf_url: str, projects: Iterable[Dict[str, str]])
 
     with tag('html', style({'font-family': 'sans-serif'})):
         with tag('table'):
-            with tag('tr'):
-                line('td', 'The NYC planning commission will have a public meeting on {}.'.format(when.strftime(DATETIME_FORMAT)))
-            with tag('tr'):
-                line('td', f'The full agenda can be found here: {pdf_url}')
+            for text in ('The NYC planning commission will have a public meeting on {}.'.format(when.strftime(DATETIME_FORMAT)),
+                         'The meeting will be located at 120 Broadway, New York, NY 10271.',
+                         f'The full agenda can be found here: {pdf_url}'):
+                with tag('tr'):
+                    line('td', text)
 
         with tag('table', table_style):
             with tag('tr'):

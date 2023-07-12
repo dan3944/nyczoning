@@ -59,7 +59,7 @@ def notify_meetings() -> None:
         Mail(from_email='nyczoningnotifications@gmail.com',
              to_emails='dccohe@gmail.com',
              subject='nyczoning report',
-             html_content=f'Successful meeting_ids: {successes}\nFailed meeting_ids: {failures}'))
+             html_content=f'Successful meeting_ids: {successes}<br>Failed meeting_ids: {failures}'))
     logging.info(f'Sent admin email: {response.status_code}')
 
 

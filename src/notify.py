@@ -9,7 +9,6 @@ from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 from typing import Dict, Iterable, Tuple
 
-FROM_EMAIL = 'nyczoningnotifications@gmail.com'
 DATETIME_FORMAT = '%A, %B %-d at %-I:%M %p'
 
 def notify_meetings() -> None:
@@ -29,26 +28,21 @@ def notify_meetings() -> None:
             GROUP BY 1, 2
         ''').fetchall()
 
-    with open('recipients.txt') as f:
-        recipients = f.read().split()
-        logging.info(f'recipients: {recipients}')
-
     logging.info(f'Found {len(meetings)} un-notified meeting(s)')
-    email_client = SendGridAPIClient(os.environ['SENDGRID_API_KEY'])
+    sg = SendGridAPIClient(os.environ['SENDGRID_API_KEY'])
     successes = []
     failures = []
 
     for meeting_id, when, pdf_url, projects in meetings:
         try:
             when = dt.datetime.fromisoformat(when)
-            mail = Mail(from_email=FROM_EMAIL,
-                        to_emails=FROM_EMAIL,
-                        subject='NYC zoning meeting on {}'.format(when.strftime(DATETIME_FORMAT)),
-                        html_content=to_html(when, pdf_url, json.loads(projects)))
-            mail.bcc = recipients
-            response = email_client.send(mail)
-            logging.info(f'Sent email for meeting_id {meeting_id}: {response.status_code}')
+            logging.info(f'Meeting ID: {meeting_id}')
+            send_email(
+                sg,
+                'NYC zoning meeting on {}'.format(when.strftime(DATETIME_FORMAT)),
+                to_html(when, pdf_url, json.loads(projects)))
             successes.append(meeting_id)
+            logging.info(f'Sent email for meeting_id {meeting_id}')
         except:
             logging.exception(f'Failed to send email for meeting_id {meeting_id}')
             failures.append(meeting_id)
@@ -61,13 +55,29 @@ def notify_meetings() -> None:
             WHERE id IN ( {','.join('?' * len(successes))} )
         ''', successes)
 
-    logging.info('Sending admin email')
-    response = email_client.send(
-        Mail(from_email=FROM_EMAIL,
+    response = sg.send(
+        Mail(from_email='nyczoningnotifications@gmail.com',
              to_emails='dccohe@gmail.com',
              subject='nyczoning report',
              html_content=f'Successful meeting_ids: {successes}\nFailed meeting_ids: {failures}'))
     logging.info(f'Sent admin email: {response.status_code}')
+
+
+def send_email(sg: SendGridAPIClient, subject: str, content: str) -> None:
+    resp = sg.client.marketing.singlesends.post(request_body={
+        'name': f'NYC zoning notification: {dt.datetime.utcnow().isoformat()}',
+        'send_to': {'all': True},
+        'email_config': {
+            'subject': subject,
+            'html_content': content,
+            'suppression_group_id': 23496,
+            'sender_id': 5135856,
+        },
+    })
+    ssid = json.loads(resp.body)['id']
+    logging.info(f'Single Send ID: {ssid} (status code: {resp.status_code})')
+    resp = sg.client.marketing.singlesends._(ssid).schedule.put(request_body={'send_at': 'now'})
+    logging.info(f'Scheduled single send (status code: {resp.status_code})')
 
 
 def to_html(when: dt.datetime, pdf_url: str, projects: Iterable[Dict[str, str]]) -> str:

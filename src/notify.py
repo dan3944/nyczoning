@@ -8,6 +8,7 @@ import yattag
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 from typing import Dict, Iterable, Tuple
+from urllib.parse import urlencode
 
 DATETIME_FORMAT = '%A, %B %-d at %-I:%M %p'
 
@@ -95,15 +96,33 @@ def to_html(when: dt.datetime, pdf_url: str, projects: Iterable[Dict[str, str]])
         'border': '1px solid black',
         'width': f'{width}%'})
 
+    gcal_link = 'https://www.google.com/calendar/render?' + urlencode({
+        'action': 'TEMPLATE',
+        'text': 'NYC Planning Commission Public Meeting',
+        'dates': f'{when:%Y%m%dT%H%M%S}/{when + dt.timedelta(hours=1):%Y%m%dT%H%M%S}',
+        'ctz': 'America/New_York',
+        'details': f'Agenda: {pdf_url}',
+        'location': 'City Planning Commission Hearing Room, Lower Concourse - 120 Broadway, New York, NY 10271',
+    })
+
     doc, tag, text, line = yattag.Doc().ttl()
 
     with tag('html', style({'font-family': 'sans-serif'})):
         with tag('table'):
-            for text in ('The NYC planning commission will have a public meeting on {}.'.format(when.strftime(DATETIME_FORMAT)),
-                         'The meeting will be located at 120 Broadway, New York, NY 10271.',
-                         f'The full agenda can be found here: {pdf_url}'):
-                with tag('tr'):
-                    line('td', text)
+            with tag('tr'):
+                line('td', 'The NYC planning commission will have a public meeting on {}.'.format(when.strftime(DATETIME_FORMAT)))
+            with tag('tr'):
+                line('td', 'Location: 120 Broadway, New York, NY 10271')
+            with tag('tr'):
+                with tag('td'):
+                    line('a', 'Add this meeting to your Google Calendar', ('href', gcal_link), ('target', '_blank'))
+            with tag('tr'):
+                with tag('td'):
+                    text('The full agenda can be found ')
+                    line('a', 'here', ('href', pdf_url), ('target', '_blank'))
+                    text('.')
+            with tag('tr'):
+                line('td', '')
 
         with tag('table', table_style):
             with tag('tr'):

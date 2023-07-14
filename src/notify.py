@@ -6,6 +6,7 @@ import re
 import sqlite3
 import yattag
 from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
 from typing import Dict, Iterable, Tuple
 from urllib.parse import urlencode
 

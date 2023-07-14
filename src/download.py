@@ -47,7 +47,19 @@ def download_meeting_pdf(pdf_url: str, when: dt.datetime) -> None:
     pdf_bytes = requests.get(pdf_url).content
     when_iso = when.isoformat(sep=' ')
     filename = f'pdfs/{when_iso}.pdf'
-    n_pages = len(pypdf.PdfReader(io.BytesIO(pdf_bytes)).pages)
+
+    pages = pypdf.PdfReader(io.BytesIO(pdf_bytes)).pages
+    commission_votes_page = next(
+        i + 1
+        for i, page in enumerate(pages)
+        if normalize('commission votes today on:') in normalize(page.extract_text())
+    )
+    public_hearings_page = next(
+        i + 1
+        for i, page in enumerate(pages)
+        if normalize('public hearings today on:') in normalize(page.extract_text())
+    )
+    last_page = len(pages) + 1
 
     logging.info(f'Saving pdf to {filename}')
     os.makedirs('pdfs', exist_ok=True)
@@ -56,27 +68,42 @@ def download_meeting_pdf(pdf_url: str, when: dt.datetime) -> None:
 
     with sqlite3.connect(os.environ['ZONING_DB_PATH']) as conn:
         db_row = when_iso, filename, pdf_url
-        logging.info(f'Inserting into database: {db_row}')
+        logging.info(f'Inserting into meetings table: {db_row}')
         cur = conn.cursor()
         cur.execute(
             'INSERT INTO meetings (datetime, pdf_filename, pdf_url, notified) VALUES (?, ?, ?, False)',
             db_row)
+        meeting_id = cur.lastrowid
 
-        logging.info('Reading pdf table into dataframe')
-        df = tabula.read_pdf(
-            io.BytesIO(pdf_bytes),
-            lattice=True,
-            multiple_tables=False,
-            relative_columns=[inches / 8.5 for inches in (0.56, 1.6, 3.1, 6.46, 8.15)],
-            pages=list(range(3, n_pages + 1)),
-        )[0] \
-            .iloc[:, 1:4] \
-            .dropna() \
-            .set_axis(['ulurp_number', 'description', 'location'], axis=1) \
-            .assign(meeting_id=cur.lastrowid)
-    
-        logging.info(f'Inserting into database:\n{df}')
+        df = read_table(pdf_bytes, commission_votes_page, public_hearings_page) \
+            .assign(meeting_id=meeting_id) \
+            .assign(is_public_hearing=False)
+        logging.info(f'Inserting into projects table:\n{df}')
         df.to_sql('projects', conn, index=False, if_exists='append')
+
+        df = read_table(pdf_bytes, public_hearings_page, last_page) \
+            .assign(meeting_id=meeting_id) \
+            .assign(is_public_hearing=True)
+        logging.info(f'Inserting into projects table:\n{df}')
+        df.to_sql('projects', conn, index=False, if_exists='append')
+
+
+def read_table(pdf_bytes: bytes, start_page: int, end_page: int):
+    return tabula.read_pdf(
+        io.BytesIO(pdf_bytes),
+        lattice=True,
+        multiple_tables=False,
+        relative_columns=[inches / 8.5 for inches in (0.56, 1.6, 3.1, 6.46, 8.15)],
+        pages=list(range(start_page, end_page)),
+    )[0] \
+        .iloc[:, 1:4] \
+        .dropna() \
+        .set_axis(['ulurp_number', 'description', 'location'], axis=1)
+
+
+def normalize(s: str) -> str:
+    # remove all whitespace because pdfs are a pain
+    return ''.join(s.lower().split())
 
 
 if __name__ == '__main__':

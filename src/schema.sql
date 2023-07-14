@@ -9,8 +9,9 @@ CREATE TABLE IF NOT EXISTS meetings (
 CREATE TABLE IF NOT EXISTS projects (
     id INTEGER PRIMARY KEY,
     meeting_id INTEGER NOT NULL,
+    is_public_hearing BOOLEAN NOT NULL, -- true = "public hearing", false = "commission votes"
     ulurp_number TEXT,
     description TEXT,
     location TEXT,
     FOREIGN KEY(meeting_id) REFERENCES meeting(meeting_id)
-)
+);

@@ -6,7 +6,6 @@ import re
 import sqlite3
 import yattag
 from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail
 from typing import Dict, Iterable, Tuple
 from urllib.parse import urlencode
 
@@ -21,7 +20,11 @@ def notify_meetings() -> None:
                 m.datetime,
                 m.pdf_url,
                 json_group_array(
-                    json_object('description', p.description, 'location', p.location)
+                    json_object(
+                        'description', p.description,
+                        'location', p.location,
+                        'is_public_hearing', p.is_public_hearing
+                    )
                 ) AS projects
             FROM meetings m
             JOIN projects p on p.meeting_id = m.id
@@ -81,11 +84,12 @@ def send_email(sg: SendGridAPIClient, subject: str, content: str) -> None:
     logging.info(f'Scheduled single send (status code: {resp.status_code})')
 
 
-def to_html(when: dt.datetime, pdf_url: str, projects: Iterable[Dict[str, str]]) -> str:
+def to_html(when: dt.datetime, pdf_url: str, projects: Iterable[Dict[str, any]]) -> str:
     table_style = style({
         'border-collapse': 'collapse',
         'border': '1px solid black',
-        'table-layout': 'fixed'})
+        'table-layout': 'fixed',
+        'margin-top': '20px'})
     header_style = style({
         'font-size': '14pt',
         'padding': '16px 8px',
@@ -106,7 +110,6 @@ def to_html(when: dt.datetime, pdf_url: str, projects: Iterable[Dict[str, str]])
     })
 
     doc, tag, text, line = yattag.Doc().ttl()
-
     with tag('html', style({'font-family': 'sans-serif'})):
         with tag('table'):
             with tag('tr'):
@@ -121,19 +124,24 @@ def to_html(when: dt.datetime, pdf_url: str, projects: Iterable[Dict[str, str]])
                     text('The full agenda can be found ')
                     line('a', 'here', ('href', pdf_url), ('target', '_blank'))
                     text('.')
-            with tag('tr'):
-                line('td', '')
 
-        with tag('table', table_style):
-            with tag('tr'):
-                for header in ('Project name and description', 'Location', 'Councilmember'):
-                    line('th', header, header_style)
-            for project in projects:
-                parsed = Project(project['description'], project['location'])
+        projects = list(map(Project, projects))
+        public_hearings = [p for p in projects if p.is_public_hearing]
+        commission_votes = [p for p in projects if not p.is_public_hearing]
+
+        for projects, title in [(public_hearings, 'Projects that will have public hearings'),
+                                (commission_votes, 'Projects that will be voted on')]:
+            with tag('table', table_style):
                 with tag('tr'):
-                    line('td', parsed.description, cell_style(50))
-                    line('td', parsed.location_str, cell_style(25))
-                    line('td', parsed.council_str, cell_style(25))
+                    line('th', title, header_style, ('colspan', '3'))
+                with tag('tr'):
+                    for header in ('Name and description', 'Location', 'Councilmember'):
+                        line('th', header, header_style)
+                for project in projects:
+                    with tag('tr'):
+                        line('td', project.description, cell_style(50))
+                        line('td', project.location_str, cell_style(25))
+                        line('td', project.council_str, cell_style(25))
 
     return doc.getvalue()
 
@@ -148,16 +156,17 @@ class Project:
         rf'Community District (\d+) (.*[^,]),? ({boroughs}) Councilmember (.+[^,]),? District (\d+)',
         flags=re.IGNORECASE)
 
-    def __init__(self, description: str, raw_location: str):
-        self.description = description
-        parsed_location = re.fullmatch(Project.pattern, ' '.join(raw_location.split()))
+    def __init__(self, unparsed: Dict[str, any]):
+        self.description = unparsed['description']
+        self.is_public_hearing = bool(unparsed['is_public_hearing'])
+        parsed_location = re.fullmatch(Project.pattern, ' '.join(unparsed['location'].split()))
 
         if parsed_location is not None:
             cd, nhood, borough, cm, district = parsed_location.groups()
             self.location_str = f'{borough} - {nhood} (Community District {cd})'
             self.council_str = f'{cm} (District {district})'
         else:
-            self.location_str = raw_location
+            self.location_str = unparsed['location']
             self.council_str = ''
 
 

@@ -9,6 +9,8 @@ import sqlite3
 import tabula
 from urllib.parse import urlparse
 
+import config
+
 
 def download_pdfs() -> None:
     url = 'https://www.nyc.gov/site/planning/about/commission-meetings.page'
@@ -107,5 +109,5 @@ def normalize(s: str) -> str:
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)
+    config.setup()
     download_pdfs()

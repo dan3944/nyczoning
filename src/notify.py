@@ -10,6 +10,8 @@ from sendgrid.helpers.mail import Mail
 from typing import Dict, Iterable, Tuple
 from urllib.parse import urlencode
 
+import config
+
 DATETIME_FORMAT = '%A, %B %-d at %-I:%M %p'
 sg = SendGridAPIClient(os.environ['SENDGRID_API_KEY'])
 
@@ -184,5 +186,5 @@ class Project:
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)
-    notify_meetings()
+    should_send_email = config.setup()
+    notify_meetings(send_email=should_send_email)

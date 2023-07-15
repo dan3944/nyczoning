@@ -10,6 +10,7 @@ import notify
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(prog='NYC Zoning Notifier')
     parser.add_argument('-l', '--logdir', help='Directory to store log files')
+    parser.add_argument('--email', action='store_true', help='Whether to send emails')
     args = parser.parse_args()
 
     if args.logdir:
@@ -20,4 +21,4 @@ if __name__ == '__main__':
 
     logging.basicConfig(level=logging.INFO, filename=logfile)
     download.download_pdfs()
-    notify.notify_meetings()
+    notify.notify_meetings(send_email=args.email)

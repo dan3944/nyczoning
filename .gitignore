@@ -1,11 +1,5 @@
 __pycache__
-bin
 database.db
-env.sh
-include
-lib
-lib64
 pdfs
-pyvenv.cfg
-recipients.txt
 sendgrid.env
+*.html

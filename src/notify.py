@@ -180,7 +180,7 @@ class Project:
             self.council_str = f'{cm} (District {district})'
         else:
             self.location_str = unparsed['location']
-            self.council_str = ''
+            self.council_str = 'None found'
 
 
 if __name__ == '__main__':

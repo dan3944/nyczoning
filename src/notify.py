@@ -13,7 +13,7 @@ from urllib.parse import urlencode
 import config
 
 DATETIME_FORMAT = '%A, %B %-d at %-I:%M %p'
-sg = SendGridAPIClient(os.environ['SENDGRID_API_KEY'])
+sg = SendGridAPIClient(os.environ.get('SENDGRID_API_KEY'))
 
 def notify_meetings(send_email=False) -> None:
     logging.info('Looking up un-notified meetings')
@@ -33,7 +33,7 @@ def notify_meetings(send_email=False) -> None:
             FROM meetings m
             JOIN projects p on p.meeting_id = m.id
             WHERE m.notified = false
-            GROUP BY 1, 2
+            GROUP BY 1, 2, 3
         ''').fetchall()
 
     logging.info(f'Found {len(meetings)} un-notified meeting(s)')

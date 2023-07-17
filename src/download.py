@@ -109,5 +109,5 @@ def normalize(s: str) -> str:
 
 
 if __name__ == '__main__':
-    config.setup()
+    config.parse_args()
     download_pdfs()

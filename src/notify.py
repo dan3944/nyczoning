@@ -12,13 +12,14 @@ from urllib.parse import urlencode
 
 import config
 
-DATETIME_FORMAT = '%A, %B %-d at %-I:%M %p'
 sg = SendGridAPIClient(os.environ.get('SENDGRID_API_KEY'))
 
-def notify_meetings(send_email=False) -> None:
+def notify_meetings(args: config.NotifierArgs) -> None:
     logging.info('Looking up un-notified meetings')
     with sqlite3.connect(os.environ['ZONING_DB_PATH']) as conn:
-        meetings = conn.execute('''
+        where_clause = 'm.notified = false' if args.meeting_id is None else 'm.id = ?'
+        params = () if args.meeting_id is None else (args.meeting_id,)
+        meetings = conn.execute(f'''
             SELECT
                 m.id,
                 m.datetime,
@@ -32,11 +33,11 @@ def notify_meetings(send_email=False) -> None:
                 ) AS projects
             FROM meetings m
             JOIN projects p on p.meeting_id = m.id
-            WHERE m.notified = false
+            WHERE {where_clause}
             GROUP BY 1, 2, 3
-        ''').fetchall()
+        ''', params).fetchall()
 
-    logging.info(f'Found {len(meetings)} un-notified meeting(s)')
+    logging.info(f'Found {len(meetings)} meeting(s) matching the criteria')
     successes = []
     failures = []
 
@@ -44,18 +45,9 @@ def notify_meetings(send_email=False) -> None:
         try:
             when = dt.datetime.fromisoformat(when)
             logging.info(f'Meeting ID: {meeting_id}')
-            subject = 'NYC zoning meeting on {}'.format(when.strftime(DATETIME_FORMAT))
+            subject = f'NYC zoning meeting on {when:%A, %B %-d}'
             content = to_html(when, pdf_url, json.loads(projects))
-
-            if send_email:
-                email_all_contacts(subject, content)
-                logging.info(f'Sent email for meeting_id {meeting_id}')
-            else:
-                filename = f'meeting_{meeting_id}.html'
-                logging.info(f'Writing to {filename} (subject: {subject})')
-                with open(filename, 'w') as f:
-                    f.write(content)
-
+            send_email(args.send, subject, content)
             successes.append(meeting_id)
         except:
             logging.exception(f'Failed to send email for meeting_id {meeting_id}')
@@ -70,7 +62,9 @@ def notify_meetings(send_email=False) -> None:
         ''', successes)
 
     admin_content = f'Successful meeting_ids: {successes}\nFailed meeting_ids: {failures}'
-    if send_email:
+    if args.send == config.SendType.local:
+        logging.info(f'Admin info:\n{admin_content}')
+    else:
         response = sg.send(Mail(
             from_email='nyczoningnotifications@gmail.com',
             to_emails='dccohe@gmail.com',
@@ -78,14 +72,21 @@ def notify_meetings(send_email=False) -> None:
             plain_text_content=admin_content,
         ))
         logging.info(f'Sent admin email: {response.status_code}')
-    else:
-        logging.info(f'Admin info:\n{admin_content}')
 
 
-def email_all_contacts(subject: str, content: str) -> None:
+def send_email(send_type: config.SendType, subject: str, content: str) -> None:
+    if send_type == config.SendType.local:
+        filename = f'{subject}.html'
+        logging.info(f'Writing to {filename}')
+        with open(filename, 'w') as f:
+            f.write(content)
+        return
+
     resp = sg.client.marketing.singlesends.post(request_body={
         'name': f'NYC zoning notification: {dt.datetime.utcnow().isoformat()}',
-        'send_to': {'all': True},
+        'send_to': {'all': True}
+                   if send_type == config.SendType.all_contacts
+                   else {'list_ids': ['2f5f6a2e-9a29-4129-aae5-235074f8ab4a']},
         'email_config': {
             'subject': subject,
             'html_content': content,
@@ -128,7 +129,7 @@ def to_html(when: dt.datetime, pdf_url: str, projects: Iterable[Dict[str, any]])
     with tag('html', style({'font-family': 'sans-serif'})):
         with tag('table'):
             with tag('tr'):
-                line('td', 'The NYC planning commission will have a public meeting on {}.'.format(when.strftime(DATETIME_FORMAT)))
+                line('td', f'The NYC planning commission will have a public meeting on {when:%A, %B %-d at %-I:%M %p}.')
             with tag('tr'):
                 line('td', 'Location: 120 Broadway, New York, NY 10271')
             with tag('tr'):
@@ -186,5 +187,5 @@ class Project:
 
 
 if __name__ == '__main__':
-    should_send_email = config.setup()
-    notify_meetings(send_email=should_send_email)
+    args = config.parse_args()
+    notify_meetings(args)

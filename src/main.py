@@ -4,6 +4,6 @@ import notify
 
 
 if __name__ == '__main__':
-    should_send_email = config.setup()
+    args = config.parse_args()
     download.download_pdfs()
-    notify.notify_meetings(send_email=should_send_email)
+    notify.notify_meetings(args)

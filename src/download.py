@@ -1,9 +1,10 @@
 import bs4
 import datetime as dt
+import fitz
 import io
 import logging
 import os
-import pypdf
+import pandas as pd
 import requests
 import sqlite3
 import tabula
@@ -28,14 +29,15 @@ def download_pdfs() -> None:
         title = section.find(class_='section-title').text
         logging.info(f'Found section "{title}"')
 
-        if title.lower().split() == ['public', 'meeting']:
+        if 'publicmeeting' in ''.join(title.lower().split()):
             logging.info('Section is a public meeting - searching for link to PDF')
             pdf_url = next(
                 'https://nyc.gov' + link['href']
                 for link in section.find_all('a', href=True)
                 if urlparse(link['href']).path.endswith('.pdf')
             )
-            date_text = section.find(id='PMDATE').find(text=True, recursive=False).strip()
+            date_text = (section.find(id='PMDATE') or section.find(id='SPMDATE')) \
+                            .find(text=True, recursive=False).strip()
             when = dt.datetime.strptime(date_text, '%A, %B %d, %Y, %I:%M %p')
 
             if when.isoformat(sep=' ') in meetings_iso:
@@ -49,19 +51,6 @@ def download_meeting_pdf(pdf_url: str, when: dt.datetime) -> None:
     pdf_bytes = requests.get(pdf_url).content
     when_iso = when.isoformat(sep=' ')
     filename = f'pdfs/{when_iso}.pdf'
-
-    pages = pypdf.PdfReader(io.BytesIO(pdf_bytes)).pages
-    commission_votes_page = next(
-        i + 1
-        for i, page in enumerate(pages)
-        if normalize('commission votes today on:') in normalize(page.extract_text())
-    )
-    public_hearings_page = next(
-        i + 1
-        for i, page in enumerate(pages)
-        if normalize('public hearings today on:') in normalize(page.extract_text())
-    )
-    last_page = len(pages) + 1
 
     logging.info(f'Saving pdf to {filename}')
     os.makedirs('pdfs', exist_ok=True)
@@ -77,35 +66,48 @@ def download_meeting_pdf(pdf_url: str, when: dt.datetime) -> None:
             db_row)
         meeting_id = cur.lastrowid
 
-        df = read_table(pdf_bytes, commission_votes_page, public_hearings_page) \
+        df = read_table(pdf_bytes, 'commission votes today on:', 'public hearings today on:') \
             .assign(meeting_id=meeting_id) \
             .assign(is_public_hearing=False)
         logging.info(f'Inserting into projects table:\n{df}')
         df.to_sql('projects', conn, index=False, if_exists='append')
 
-        df = read_table(pdf_bytes, public_hearings_page, last_page) \
+        df = read_table(pdf_bytes, 'public hearings today on:') \
             .assign(meeting_id=meeting_id) \
             .assign(is_public_hearing=True)
         logging.info(f'Inserting into projects table:\n{df}')
         df.to_sql('projects', conn, index=False, if_exists='append')
 
 
-def read_table(pdf_bytes: bytes, start_page: int, end_page: int):
-    return tabula.read_pdf(
-        io.BytesIO(pdf_bytes),
-        lattice=True,
-        multiple_tables=False,
-        relative_columns=[inches / 8.5 for inches in (0.56, 1.6, 3.1, 6.46, 8.15)],
-        pages=list(range(start_page, end_page)),
-    )[0] \
-        .iloc[:, 1:4] \
-        .dropna() \
-        .set_axis(['ulurp_number', 'description', 'location'], axis=1)
+def read_table(pdf_bytes, start_text=None, end_text=None):
+    found_start_page = start_text is None
+    columns = 'ulurp_number', 'description', 'location'
+    dfs = []
 
+    for i, page in enumerate(fitz.open('pdf', pdf_bytes)):
+        if not found_start_page:
+            found_start_page = bool(page.search_for(start_text))
+        elif end_text is not None and page.search_for(end_text):
+            break
+        elif not page.search_for('Calendar No.'):
+            break
 
-def normalize(s: str) -> str:
-    # remove all whitespace because pdfs are a pain
-    return ''.join(s.lower().split())
+        if found_start_page:
+            _, _, page_width, page_height = page.bound()
+            table_start = min(rect.y0 for rect in page.search_for('Calendar No.'))
+            dfs.append(tabula.read_pdf(
+                io.BytesIO(pdf_bytes),
+                lattice=True,
+                multiple_tables=False,
+                relative_area=True,
+                relative_columns=True,
+                area=(round(100 * table_start / page_height), 0, 100, 100),
+                columns=[round(100 * inches / 8.5) for inches in (1.6, 3.1, 6.46)],
+                pages=i+1,
+                silent=True,
+            )[0].iloc[:, 2:5].set_axis(columns, axis=1))
+
+    return pd.concat(dfs).dropna() if dfs else pd.DataFrame(columns=columns)
 
 
 if __name__ == '__main__':

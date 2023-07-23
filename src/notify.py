@@ -150,14 +150,18 @@ def to_html(when: dt.datetime, pdf_url: str, projects: Iterable[Dict[str, any]])
             with tag('table', table_style):
                 with tag('tr'):
                     line('th', title, header_style, ('colspan', '3'))
-                with tag('tr'):
-                    for header in ('Name and description', 'Location', 'Councilmember'):
-                        line('th', header, header_style)
-                for project in projects:
+                if projects:
                     with tag('tr'):
-                        line('td', project.description, cell_style(50))
-                        line('td', project.location_str, cell_style(25))
-                        line('td', project.council_str, cell_style(25))
+                        for header in ('Name and description', 'Location', 'Councilmember'):
+                            line('th', header, header_style)
+                    for project in projects:
+                        with tag('tr'):
+                            line('td', project.description, cell_style(50))
+                            line('td', project.location_str, cell_style(25))
+                            line('td', project.council_str, cell_style(25))
+                else:
+                    with tag('tr'):
+                        line('td', 'None found', cell_style(100))
 
     return doc.getvalue()
 

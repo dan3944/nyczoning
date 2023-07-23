@@ -17,7 +17,6 @@ def download_pdfs() -> None:
     url = 'https://www.nyc.gov/site/planning/about/commission-meetings.page'
     logging.info(f'Getting links from {url}')
     resp = requests.get(url)
-    logging.info('Parsing HTML')
     soup = bs4.BeautifulSoup(resp.text, features='lxml')
 
     with sqlite3.connect(os.environ['ZONING_DB_PATH']) as conn:
@@ -66,17 +65,11 @@ def download_meeting_pdf(pdf_url: str, when: dt.datetime) -> None:
             db_row)
         meeting_id = cur.lastrowid
 
-        df = read_table(pdf_bytes, 'commission votes today on:', 'public hearings today on:') \
-            .assign(meeting_id=meeting_id) \
-            .assign(is_public_hearing=False)
-        logging.info(f'Inserting into projects table:\n{df}')
-        df.to_sql('projects', conn, index=False, if_exists='append')
-
-        df = read_table(pdf_bytes, 'public hearings today on:') \
-            .assign(meeting_id=meeting_id) \
-            .assign(is_public_hearing=True)
-        logging.info(f'Inserting into projects table:\n{df}')
-        df.to_sql('projects', conn, index=False, if_exists='append')
+        df1 = read_table(pdf_bytes, 'commission votes today on:', 'public hearings today on:').assign(is_public_hearing=False)
+        df2 = read_table(pdf_bytes, 'public hearings today on:').assign(is_public_hearing=True)
+        all_rows = pd.concat([df1, df2]).assign(meeting_id=meeting_id)
+        logging.info(f'Inserting into projects table:\n{all_rows}')
+        all_rows.to_sql('projects', conn, index=False, if_exists='append')
 
 
 def read_table(pdf_bytes, start_text=None, end_text=None):

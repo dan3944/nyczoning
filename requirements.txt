@@ -1,5 +1,5 @@
 beautifulsoup4==4.8.2
-pandas==1.0.1
+pandas
 pycryptodome==3.18.0
 PyMuPDF==1.22.5
 requests==2.31.0

@@ -129,6 +129,8 @@ def to_html(when: dt.datetime, pdf_url: str, projects: Iterable[Dict[str, any]])
     with tag('html', style({'font-family': 'sans-serif'})):
         with tag('table'):
             with tag('tr'):
+                line('td', '{{#if first_name}}Hi {{first_name}},{{/if}}')
+            with tag('tr'):
                 line('td', f'The NYC planning commission will have a public meeting on {when:%A, %B %-d at %-I:%M %p}.')
             with tag('tr'):
                 line('td', 'Location: 120 Broadway, New York, NY 10271')

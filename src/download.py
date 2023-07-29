@@ -82,23 +82,33 @@ def read_table(pdf_bytes, start_text=None, end_text=None):
             found_start_page = bool(page.search_for(start_text))
         elif end_text is not None and page.search_for(end_text):
             break
-        elif not page.search_for('Calendar No.'):
-            break
 
-        if found_start_page:
-            _, _, page_width, page_height = page.bound()
-            table_start = min(rect.y0 for rect in page.search_for('Calendar No.'))
-            dfs.append(tabula.read_pdf(
-                io.BytesIO(pdf_bytes),
-                lattice=True,
-                multiple_tables=False,
-                relative_area=True,
-                relative_columns=True,
-                area=(round(100 * table_start / page_height), 0, 100, 100),
-                columns=[round(100 * inches / 8.5) for inches in (1.6, 3.1, 6.46)],
-                pages=i+1,
-                silent=True,
-            )[0].iloc[:, 2:5].set_axis(columns, axis=1))
+        if not found_start_page:
+            continue
+
+        calendar_no = page.search_for('Calendar No.')
+        meeting_rules = page.search_for('Meeting rules')
+
+        if calendar_no:
+            table_start = min(rect.y0 for rect in calendar_no)
+        elif meeting_rules:
+            break
+        else:
+            table_start = 0
+
+        _, _, page_width, page_height = page.bound()
+        dfs.append(tabula.read_pdf(
+            io.BytesIO(pdf_bytes),
+            lattice=True,
+            multiple_tables=False,
+            relative_area=True,
+            relative_columns=True,
+            area=(round(100 * table_start / page_height), 0, 100, 100),
+            columns=[round(100 * inches / 8.5) for inches in (1.6, 3.1, 6.46)],
+            pages=i+1,
+            silent=True,
+            pandas_options={'header': None},
+        )[0].iloc[:, 2:5].set_axis(columns, axis=1))
 
     return pd.concat(dfs).dropna() if dfs else pd.DataFrame(columns=columns)
 

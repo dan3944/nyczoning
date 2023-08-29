@@ -29,6 +29,10 @@ class TestParsePdf(unittest.TestCase):
                 pdf_name='pdfs/2023-08-09 100000.pdf',
                 want_num_commission_votes=8,
                 want_num_public_hearings=4),
+            ReadTableTestCase(
+                pdf_name='pdfs/2023-08-23 100000.pdf',
+                want_num_commission_votes=7,
+                want_num_public_hearings=2),
         ]
 
         for i, test in enumerate(test_cases):

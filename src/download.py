@@ -30,11 +30,17 @@ def download_pdfs() -> None:
 
         if 'publicmeeting' in ''.join(title.lower().split()):
             logging.info('Section is a public meeting - searching for link to PDF')
-            pdf_url = next(
-                'https://nyc.gov' + link['href']
-                for link in section.find_all('a', href=True)
-                if urlparse(link['href']).path.endswith('.pdf')
-            )
+
+            try:
+                pdf_url = next(
+                    'https://nyc.gov' + link['href']
+                    for link in section.find_all('a', href=True)
+                    if urlparse(link['href']).path.endswith('.pdf')
+                )
+            except StopIteration:
+                logging.info('No PDF found. Skipping this section.')
+                continue
+
             date_text = (section.find(id='PMDATE') or section.find(id='SPMDATE')) \
                             .find(text=True, recursive=False).strip()
             when = dt.datetime.strptime(date_text, '%A, %B %d, %Y, %I:%M %p')

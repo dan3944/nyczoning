@@ -6,11 +6,11 @@ import logging
 import os
 import pandas as pd
 import requests
-import sqlite3
 import tabula
 from urllib.parse import urlparse
 
 import config
+import db
 
 
 def download_pdfs() -> None:
@@ -19,9 +19,9 @@ def download_pdfs() -> None:
     resp = requests.get(url)
     soup = bs4.BeautifulSoup(resp.text, features='lxml')
 
-    with sqlite3.connect(os.environ['ZONING_DB_PATH']) as conn:
+    with db.Connection() as conn:
         meetings_iso = {
-            when for when, in conn.execute('SELECT datetime FROM meetings').fetchall()
+            meeting.when.isoformat() for meeting in conn.list_meetings()
         }
 
     for section in soup.find_all('div', class_='section'):
@@ -45,7 +45,7 @@ def download_pdfs() -> None:
                             .find(text=True, recursive=False).strip()
             when = dt.datetime.strptime(date_text, '%A, %B %d, %Y, %I:%M %p')
 
-            if when.isoformat(sep=' ') in meetings_iso:
+            if when.isoformat() in meetings_iso:
                 logging.info(f'Skipping {when} because it is already in db')
             else:
                 download_meeting_pdf(pdf_url, when)
@@ -54,28 +54,19 @@ def download_pdfs() -> None:
 def download_meeting_pdf(pdf_url: str, when: dt.datetime) -> None:
     logging.info(f'Dowloading pdf from {pdf_url}')
     pdf_bytes = requests.get(pdf_url).content
-    when_iso = when.isoformat(sep=' ')
-    filename = f'pdfs/{when_iso}.pdf'
+    filename = f'src/static/{when.isoformat(sep=" ")}.pdf'
 
     logging.info(f'Saving pdf to {filename}')
     os.makedirs('pdfs', exist_ok=True)
     with open(filename, 'wb') as f:
         f.write(pdf_bytes)
 
-    with sqlite3.connect(os.environ['ZONING_DB_PATH']) as conn:
-        db_row = when_iso, filename, pdf_url
-        logging.info(f'Inserting into meetings table: {db_row}')
-        cur = conn.cursor()
-        cur.execute(
-            'INSERT INTO meetings (datetime, pdf_filename, pdf_url, notified) VALUES (?, ?, ?, False)',
-            db_row)
-        meeting_id = cur.lastrowid
-
+    with db.Connection() as conn:
+        meeting_id = conn.insert_meeting(when, filename, pdf_url)
         df1 = read_table(pdf_bytes, 'commission votes today on:', 'public hearings today on:').assign(is_public_hearing=False)
         df2 = read_table(pdf_bytes, 'public hearings today on:').assign(is_public_hearing=True)
         all_rows = pd.concat([df1, df2]).assign(meeting_id=meeting_id)
-        logging.info(f'Inserting into projects table:\n{all_rows}')
-        all_rows.to_sql('projects', conn, index=False, if_exists='append')
+        conn.insert_projects_df(all_rows)
 
 
 def read_table(pdf_bytes, start_text=None, end_text=None):

@@ -19,7 +19,7 @@
             }
 
             const meeting = meetings[i];
-            document.getElementById('meetingDate').innerText = 'Meeting of ' + meeting['when'];
+            document.getElementById('meetingDate').innerText = meeting['when'];
             document.getElementById('meetingPdfUrl').href = meeting['pdf_path'];
             document.getElementById('meetingGcalLink').href = meeting['gcal_link'];
             populateTable('publicHearingProjects', meeting.projects.filter(project => project['is_public_hearing']));
@@ -93,6 +93,9 @@
 
         <div class="overflow-auto p-3 w-100">
             <h2 id="meetingDate"></h2>
+            <div class="lead mb-2">
+                City Planning Commission Hearing Room, Lower Concourse - 120 Broadway, New York, NY
+            </div>
             <div class="d-flex flex-column">
                 <a id="meetingPdfUrl" target="_blank" class="text-decoration-none">
                     <i class="bi-file-earmark-pdf"></i>

@@ -8,8 +8,13 @@ import db
 app = Flask(__name__)
 
 
-@app.route('/meetings')
-def meetings() -> None:
+@app.route('/')
+def home() -> None:
+    return render_template('index.html')
+
+
+@app.route('/nycplanning')
+def nycplanning() -> None:
     with db.Connection() as conn:
         meetings = conn.list_meetings()
 

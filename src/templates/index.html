@@ -1,0 +1,53 @@
+<head>
+    <title>The Manual</title>
+    <style>
+        .rainbow-text {
+            background-image: linear-gradient(to left, violet, indigo, blue, green, yellow, orange, red);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            float: right;
+            font-style: italic;
+            font-family: sans-serif;
+            font-size: 40px;
+            margin: 0;
+        }
+
+        .marquee {
+            overflow: hidden;
+            animation: marquee 15s linear infinite;
+        }
+
+        .reverse-marquee {
+            overflow: hidden;
+            animation: reverse-marquee 15s linear infinite;
+        }
+
+        @keyframes marquee {
+            0%   { transform: translatex(0%); }
+            100% { transform: translatex(-100%); }
+        }
+
+        @keyframes reverse-marquee {
+            0%   { transform: translatex(-100%); }
+            100% { transform: translatex(0%); }
+        }
+
+        #nycplanning {
+            position: absolute;
+            bottom: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <p>I am known to some as</p>
+    <p><b>Dan The Man</b></p>
+    <p>But please refer to me by my full name,</p>
+    <div class="marquee">
+        <p class="rainbow-text">Daniel The Maniel</p>
+    </div>
+    <a id="nycplanning" href="/nycplanning">Click here for the NYC Planning Commission agendas</a>
+</body>
+
+<!-- You can email me at cohen at danielthemaniel dot com -->

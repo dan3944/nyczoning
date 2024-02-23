@@ -19,7 +19,7 @@ def meetings() -> None:
 
 
 def _is_upcoming(meeting: db.Meeting) -> bool:
-    return meeting.when.date() >= dt.date.today() - dt.timedelta(days=1) # remove
+    return meeting.when.date() >= dt.date.today()
 
 
 def _to_dict(meeting: db.Meeting) -> str:

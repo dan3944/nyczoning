@@ -16,7 +16,7 @@ class Project:
     is_public_hearing: bool
     location: str
     councilmember: str
-    
+
     _boroughs: ClassVar[str] = '|'.join(['Brooklyn', 'Manhattan', 'Queens', 'Staten Island', 'The Bronx'])
     _pattern: ClassVar[str] = re.compile(
         rf'Community District (\d+) (.*[^,]),? ({_boroughs}) Councilmember (.+[^,]),? District (\d+)',
@@ -33,7 +33,7 @@ class Project:
         else:
             location_str = unparsed['location']
             council_str = 'None found'
-        
+
         return Project(
             description=unparsed['description'],
             is_public_hearing=bool(unparsed['is_public_hearing']),
@@ -47,15 +47,6 @@ class Meeting:
     when: dt.datetime
     pdf_url: str
     projects: List[Project]
-
-    def jsonify(self):
-        d = asdict(self)
-        d['when'] = d['when'].strftime('%A, %B %-d %Y')
-        print(json.dumps(d))
-        return json.dumps(d)
-    
-    def pdf_filepath(self):
-        return self.when.isoformat(sep=" ") + '.pdf'
 
     @staticmethod
     def create(unparsed: Dict[str, any]) -> Meeting:
@@ -99,7 +90,7 @@ class Connection:
             where_clause += ' and m.notified = ?'
             params.append(notified)
 
-        logging.info(f'Querying meetings: "{where_clause}", {params}')
+        logging.info(f'Listing meetings: "{where_clause}", {params}')
 
         rows = self._conn.execute(f'''
             SELECT

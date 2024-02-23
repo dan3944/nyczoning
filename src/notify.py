@@ -6,7 +6,6 @@ import yattag
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 from typing import Dict, Tuple
-from urllib.parse import urlencode
 
 import config
 import db
@@ -93,15 +92,6 @@ def to_html(meeting: db.Meeting) -> str:
         'border': '1px solid black',
         'width': f'{width}%'})
 
-    gcal_link = 'https://www.google.com/calendar/render?' + urlencode({
-        'action': 'TEMPLATE',
-        'text': 'NYC Planning Commission Public Meeting',
-        'dates': f'{meeting.when:%Y%m%dT%H%M%S}/{meeting.when + dt.timedelta(hours=1):%Y%m%dT%H%M%S}',
-        'ctz': 'America/New_York',
-        'details': f'Agenda: {meeting.pdf_url}',
-        'location': 'City Planning Commission Hearing Room, Lower Concourse - 120 Broadway, New York, NY 10271',
-    })
-
     doc, tag, text, line = yattag.Doc().ttl()
     with tag('html', style({'font-family': 'sans-serif'})):
         with tag('table'):
@@ -113,7 +103,7 @@ def to_html(meeting: db.Meeting) -> str:
                 line('td', 'Location: 120 Broadway, New York, NY 10271')
             with tag('tr'):
                 with tag('td'):
-                    line('a', 'Add this meeting to your Google Calendar', ('href', gcal_link), ('target', '_blank'))
+                    line('a', 'Add this meeting to your Google Calendar', ('href', meeting.gcal_link()), ('target', '_blank'))
             with tag('tr'):
                 with tag('td'):
                     text('The full agenda can be found ')

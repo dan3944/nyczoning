@@ -4,7 +4,6 @@ from flask import Flask, render_template
 
 import db
 
-# TODO: '%-I:%M %p' for time
 
 app = Flask(__name__)
 
@@ -24,8 +23,9 @@ def _is_upcoming(meeting: db.Meeting) -> bool:
 
 def _to_dict(meeting: db.Meeting) -> str:
     d = asdict(meeting)
-    d['when'] = d['when'].strftime('%A, %B %-d %Y')
+    d['when'] = d['when'].strftime('%A, %B %-d, %Y at %-I:%M %p')
     d['pdf_path'] = f'/static/{meeting.when.isoformat(sep=" ")}.pdf'
+    d['gcal_link'] = meeting.gcal_link()
     for project in d['projects']:
         project['description'] = project['description'].replace('\r', ' ')
     return d

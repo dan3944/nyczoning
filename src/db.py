@@ -6,7 +6,8 @@ import os
 import pandas as pd
 import re
 import sqlite3
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
+from urllib.parse import urlencode
 from typing import ClassVar, Dict, List, Optional
 
 
@@ -47,6 +48,16 @@ class Meeting:
     when: dt.datetime
     pdf_url: str
     projects: List[Project]
+
+    def gcal_link(self) -> str:
+        return 'https://www.google.com/calendar/render?' + urlencode({
+            'action': 'TEMPLATE',
+            'text': 'NYC Planning Commission Public Meeting',
+            'dates': f'{self.when:%Y%m%dT%H%M%S}/{self.when + dt.timedelta(hours=1):%Y%m%dT%H%M%S}',
+            'ctz': 'America/New_York',
+            'details': f'Agenda: {self.pdf_url}',
+            'location': 'City Planning Commission Hearing Room, Lower Concourse - 120 Broadway, New York, NY 10271',
+        })
 
     @staticmethod
     def create(unparsed: Dict[str, any]) -> Meeting:

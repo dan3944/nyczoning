@@ -31,6 +31,7 @@ def _to_dict(meeting: db.Meeting) -> str:
     d['when'] = d['when'].strftime('%A, %B %-d, %Y at %-I:%M %p')
     d['pdf_path'] = f'/static/{meeting.when.isoformat(sep=" ")}.pdf'
     d['gcal_link'] = meeting.gcal_link()
+    d['is_upcoming'] = _is_upcoming(meeting)
     for project in d['projects']:
         project['description'] = project['description'].replace('\r', ' ')
     return d

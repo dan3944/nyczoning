@@ -22,6 +22,19 @@
             document.getElementById('meetingGcalLink').href = meeting['gcal_link'];
             populateTable('publicHearingProjects', meeting.projects.filter(project => project['is_public_hearing']));
             populateTable('votedOnProjects', meeting.projects.filter(project => !project['is_public_hearing']));
+
+            document.getElementById('publicHearingsAccordion').classList.remove('show');
+            document.getElementById('votedOnAccordion').classList.remove('show');
+            document.getElementById('publicHearingsButton').classList.add('collapsed');
+            document.getElementById('votedOnButton').classList.add('collapsed');
+
+            document.getElementById('publicHearingsButton').innerText = meeting['is_upcoming']
+                ? 'Projects that will have public hearings'
+                : 'Projects that had public hearings';
+
+            document.getElementById('votedOnButton').innerText = meeting['is_upcoming']
+                ? 'Projects that will be voted on'
+                : 'Projects that were voted on';
         }
 
         function td(text, width=null) {
@@ -115,11 +128,10 @@
             <div class="accordion pt-1">
                 <div class="accordion-item">
                     <h2 class="accordion-header">
-                        <button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#collapseOne">
-                            Projects that will have public hearings
+                        <button id="publicHearingsButton" class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#publicHearingsAccordion">
                         </button>
                     </h2>
-                    <div id="collapseOne" class="accordion-collapse collapse">
+                    <div id="publicHearingsAccordion" class="accordion-collapse collapse">
                         <div class="accordion-body">
                             <table class="table">
                                 <thead>
@@ -134,11 +146,10 @@
                 </div>
                 <div class="accordion-item">
                     <h2 class="accordion-header">
-                        <button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#collapseTwo">
-                            Projects that will be voted on
+                        <button id="votedOnButton" class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#votedOnAccordion">
                         </button>
                     </h2>
-                    <div id="collapseTwo" class="accordion-collapse collapse">
+                    <div id="votedOnAccordion" class="accordion-collapse collapse">
                         <div class="accordion-body">
                             <table class="table">
                                 <thead>

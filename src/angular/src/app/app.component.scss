@@ -1,0 +1,15 @@
+.divider {
+    height: 100vh;
+    width: 1.5rem;
+    background-color: rgba(0, 0, 0, .1);
+    box-shadow: inset 0 .125em .5em rgba(0, 0, 0, .1);
+}
+
+.iframe-container {
+    width: fit-content;
+    
+    iframe {
+        height: 540px;
+        width: 580px;
+    }
+}

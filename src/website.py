@@ -1,6 +1,6 @@
-import datetime as dt
 from dataclasses import asdict
-from flask import Flask, render_template
+from flask import Flask, render_template, send_from_directory
+from typing import List
 
 import db
 
@@ -14,28 +14,27 @@ def home() -> None:
 
 
 @app.route('/nycplanning')
-def nycplanning() -> None:
+def angular():
+    return send_from_directory('static/dist/nycplanning/browser', 'index.html')
+
+
+@app.route('/<path:path>')
+def static_proxy(path):
+  return send_from_directory('static/dist/nycplanning/browser', path)
+
+
+@app.route('/meetings')
+def meetings() -> List[dict]:
     with db.Connection() as conn:
         meetings = conn.list_meetings()
-
     meetings.sort(key=lambda meeting: meeting.when, reverse=True)
-    return render_template('meetings.html', meetings=meetings)
+    return list(map(_to_dict, meetings))
 
 
-def _is_upcoming(meeting: db.Meeting) -> bool:
-    return meeting.when.date() >= dt.date.today()
-
-
-def _to_dict(meeting: db.Meeting) -> str:
+def _to_dict(meeting: db.Meeting) -> dict:
     d = asdict(meeting)
-    d['when'] = d['when'].strftime('%A, %B %-d, %Y at %-I:%M %p')
     d['pdf_path'] = f'/static/{meeting.when.isoformat(sep=" ")}.pdf'
     d['gcal_link'] = meeting.gcal_link()
-    d['is_upcoming'] = _is_upcoming(meeting)
     for project in d['projects']:
         project['description'] = project['description'].replace('\r', ' ')
     return d
-
-
-app.jinja_env.filters['is_upcoming'] = _is_upcoming
-app.jinja_env.filters['to_dict'] = _to_dict

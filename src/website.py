@@ -1,5 +1,5 @@
 from dataclasses import asdict
-from flask import Flask, render_template, send_from_directory
+from flask import Flask, jsonify, render_template, send_from_directory
 from typing import List
 
 import db
@@ -28,7 +28,7 @@ def meetings() -> List[dict]:
     with db.Connection() as conn:
         meetings = conn.list_meetings()
     meetings.sort(key=lambda meeting: meeting.when, reverse=True)
-    return list(map(_to_dict, meetings))
+    return jsonify(list(map(_to_dict, meetings)))
 
 
 def _to_dict(meeting: db.Meeting) -> dict:

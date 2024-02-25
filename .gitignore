@@ -1,5 +1,5 @@
 __pycache__
 database.db
 sendgrid.env
-NYC zoning meeting on *
-static/
+NYC zoning meeting on *.html
+*.pdf

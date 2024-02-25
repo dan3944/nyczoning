@@ -15,12 +15,12 @@ def home() -> None:
 
 @app.route('/nycplanning')
 def angular():
-    return send_from_directory('static/dist/nycplanning/browser', 'index.html')
+    return send_from_directory('static/dist/browser', 'index.html')
 
 
 @app.route('/<path:path>')
 def static_proxy(path):
-  return send_from_directory('static/dist/nycplanning/browser', path)
+    return send_from_directory('static/dist/browser', path)
 
 
 @app.route('/meetings')

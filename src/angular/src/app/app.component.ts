@@ -32,7 +32,7 @@ class Meeting {
   readonly sections: Array<{name: string, projects: Project[]}>;
 
   constructor(json: any) {
-    this.id = json['id'] as number;
+    this.id = json['id'];
     this.when = new Date(json['when']);
     this.gcalLink = json['gcal_link'];
     this.pdfPath = json['pdf_path'];

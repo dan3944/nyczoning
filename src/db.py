@@ -75,6 +75,8 @@ class Connection:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_val is None:
+            self._conn.commit()
         self._conn.close()
 
     def insert_meeting(self, when: dt.datetime, filename: str, pdf_url: str) -> int:

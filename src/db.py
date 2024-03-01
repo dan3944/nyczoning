@@ -19,7 +19,7 @@ class Project:
     councilmember: str
 
     _boroughs: ClassVar[str] = '|'.join(['Brooklyn', 'Manhattan', 'Queens', 'Staten Island', 'The Bronx'])
-    _pattern: ClassVar[str] = re.compile(
+    _pattern: ClassVar[re.Pattern] = re.compile(
         rf'Community District (\d+) (.*[^,]),? ({_boroughs}) Councilmember (.+[^,]),? District (\d+)',
         flags=re.IGNORECASE)
 

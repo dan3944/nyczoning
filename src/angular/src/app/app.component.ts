@@ -16,58 +16,58 @@ export class AppComponent implements OnInit {
 
   ngOnInit(): void {
     this.http.get('/meetings').subscribe((json) => {
-      this.meetings = (json as any[]).map(m => new Meeting(m));
+      this.meetings = (json as MeetingJson[]).map(m => new Meeting(m));
       this.selectedMeeting = this.meetings[0];
     });
   }
 }
 
-const today = new Date(new Date().toDateString());
+type ProjectJson = {
+  readonly councilmember: string;
+  readonly description: string;
+  readonly location: string;
+  readonly is_public_hearing: boolean;
+};
+
+type MeetingJson = {
+  id: number,
+  when: string,
+  gcal_link: string,
+  pdf_path: string,
+  projects: ProjectJson[],
+};
 
 class Meeting {
+  static readonly today = new Date(new Date().toDateString());
+
   readonly id: number;
   readonly when: Date;
   readonly gcalLink: string;
   readonly pdfPath: string;
-  readonly sections: Array<{name: string, projects: Project[]}>;
+  readonly sections: Array<{name: string, projects: ProjectJson[]}>;
 
-  constructor(json: any) {
-    this.id = json['id'];
-    this.when = new Date(json['when']);
-    this.gcalLink = json['gcal_link'];
-    this.pdfPath = json['pdf_path'];
+  constructor(json: MeetingJson) {
+    this.id = json.id;
+    this.when = new Date(json.when);
+    this.gcalLink = json.gcal_link;
+    this.pdfPath = json.pdf_path;
 
-    const projects = (json['projects'] as any[]).map(p => new Project(p));
     this.sections = [
       {
         name: this.isUpcoming() ? 'Projects that will have public hearings' : 'Projects that had public hearings',
-        projects: projects.filter(p => p.isPublicHearing),
+        projects: json.projects.filter(p => p.is_public_hearing),
       }, {
         name: this.isUpcoming() ? 'Projects that will be voted on' : 'Projects that were voted on',
-        projects: projects.filter(p => !p.isPublicHearing),
+        projects: json.projects.filter(p => !p.is_public_hearing),
       },
     ];
   }
 
   isUpcoming(): boolean {
-    return today <= this.when;
+    return Meeting.today <= this.when;
   }
 
   projectCount(): number {
     return this.sections.map(section => section.projects.length).reduce((a, b) => a + b, 0);
-  }
-}
-
-class Project {
-  readonly councilmember: string;
-  readonly description: string;
-  readonly location: string;
-  readonly isPublicHearing: boolean;
-
-  constructor(json: any) {
-    this.councilmember = json['councilmember'];
-    this.description = json['description'];
-    this.location = json['location'];
-    this.isPublicHearing = json['is_public_hearing'];
   }
 }

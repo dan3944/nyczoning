@@ -15,8 +15,8 @@ export class AppComponent implements OnInit {
   constructor(private readonly http: HttpClient) {}
 
   ngOnInit(): void {
-    this.http.get('/meetings').subscribe((json) => {
-      this.meetings = (json as MeetingJson[]).map(m => new Meeting(m));
+    this.http.get<MeetingJson[]>('/meetings').subscribe((json) => {
+      this.meetings = json.map(m => new Meeting(m));
       this.selectedMeeting = this.meetings[0];
     });
   }

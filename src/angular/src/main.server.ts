@@ -1,14 +1,11 @@
-import { bootstrapApplication } from '@angular/platform-browser';
-import { AppComponent } from './app/app.component';
+import { bootstrapApplication, provideClientHydration } from '@angular/platform-browser';
 import { provideServerRendering } from '@angular/platform-server';
-import { provideClientHydration } from '@angular/platform-browser';
-import { provideHttpClient, withFetch } from '@angular/common/http';
+import { AppComponent } from './app/app.component';
 
 const bootstrap = () => bootstrapApplication(AppComponent, {
     providers: [
         provideClientHydration(),
         provideServerRendering(),
-        provideHttpClient(withFetch()),
     ]
 });
 

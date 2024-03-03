@@ -1,24 +1,27 @@
-import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { Component, OnInit } from '@angular/core';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [HttpClientModule],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss',
 })
 export class AppComponent implements OnInit {
   meetings: Meeting[] = [];
   selectedMeeting?: Meeting;
+  isLoading: boolean = true;
+  errorMessage?: string
 
-  constructor(private readonly http: HttpClient) {}
-
-  ngOnInit(): void {
-    this.http.get<MeetingJson[]>('/meetings').subscribe((json) => {
-      this.meetings = json.map(m => new Meeting(m));
+  async ngOnInit(): Promise<void> {
+    try {
+      const response = await fetch('meetings').then(resp => resp.json());
+      this.meetings = (response as MeetingJson[]).map(m => new Meeting(m));
       this.selectedMeeting = this.meetings[0];
-    });
+    } catch (e) {
+      this.errorMessage = `Error: Failed to get NYC planning agendas: ${e}`;
+    } finally {
+      this.isLoading = false;
+    }
   }
 }
 
@@ -51,7 +54,6 @@ class Meeting {
     this.when = new Date(json.when);
     this.gcalLink = json.gcal_link;
     this.pdfPath = json.pdf_path;
-
     this.sections = [
       {
         name: this.isUpcoming() ? 'Projects that will have public hearings' : 'Projects that had public hearings',
@@ -68,6 +70,6 @@ class Meeting {
   }
 
   projectCount(): number {
-    return this.sections.map(section => section.projects.length).reduce((a, b) => a + b, 0);
+    return this.sections.reduce((count, section) => count + section.projects.length, 0);
   }
 }

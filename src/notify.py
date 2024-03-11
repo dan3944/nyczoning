@@ -42,7 +42,7 @@ def notify_meetings(args: config.NotifierArgs) -> None:
         logging.info(f'Admin info:\n{admin_content}')
     else:
         response = sg.send(Mail(
-            from_email='nyczoningnotifications@gmail.com',
+            from_email='nycplanning@danielthemaniel.com',
             to_emails='dccohe@gmail.com',
             subject='nyczoning report',
             plain_text_content=admin_content,
@@ -67,7 +67,7 @@ def send_email(send_type: config.SendType, subject: str, content: str) -> None:
             'subject': subject,
             'html_content': content,
             'suppression_group_id': 23496,
-            'sender_id': 5135856,
+            'sender_id': 5664084,
         },
     })
     ssid = json.loads(resp.body)['id']

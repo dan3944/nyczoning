@@ -116,20 +116,24 @@ def to_html(meeting: db.Meeting) -> str:
         for projects, title in [(public_hearings, 'Projects that will have public hearings'),
                                 (commission_votes, 'Projects that will be voted on')]:
             with tag('table', table_style):
-                with tag('tr'):
-                    line('th', title, header_style, ('colspan', '3'))
-                if projects:
+                with tag('thead'):
                     with tag('tr'):
-                        for header in ('Name and description', 'Location', 'Councilmember'):
-                            line('th', header, header_style)
-                    for project in projects:
+                        line('th', title, header_style, ('colspan', '3'))
+                    if projects:
                         with tag('tr'):
-                            line('td', project.description, cell_style(50))
-                            line('td', project.location, cell_style(25))
-                            line('td', project.councilmember, cell_style(25))
+                            for header in ('Name and description', 'Location', 'Councilmember'):
+                                line('th', header, header_style)
+                if projects:
+                    with tag('tbody'):
+                        for project in projects:
+                            with tag('tr'):
+                                line('td', project.description, cell_style(50))
+                                line('td', project.location, cell_style(25))
+                                line('td', project.councilmember, cell_style(25))
                 else:
-                    with tag('tr'):
-                        line('td', 'None found', cell_style(100))
+                    with tag('tbody'):
+                        with tag('tr'):
+                            line('td', 'None found', cell_style(100))
 
     return doc.getvalue()
 

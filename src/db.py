@@ -132,3 +132,11 @@ class Connection:
             SET notified = ?
             WHERE id IN ( {','.join('?' * len(meeting_ids))} )
         ''', [notified] + meeting_ids)
+
+    def clear_db(self) -> None:
+        self._conn.execute(f'''
+            DELETE FROM meetings;
+        ''')
+        self._conn.execute(f'''
+            DELETE FROM projects;
+        ''')

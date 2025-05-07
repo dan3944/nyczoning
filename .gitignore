@@ -3,3 +3,4 @@ database.db
 sendgrid.env
 NYC zoning meeting on *.html
 *.pdf
+*.db

@@ -1,10 +1,12 @@
 import { Component, OnInit } from '@angular/core';
+import { BudgetVizComponent } from '../budget-viz/budget-viz.component';
 
 @Component({
   selector: 'app-root',
   standalone: true,
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss',
+  imports: [BudgetVizComponent],
 })
 export class AppComponent implements OnInit {
   meetings: Meeting[] = [];
@@ -14,7 +16,7 @@ export class AppComponent implements OnInit {
 
   async ngOnInit(): Promise<void> {
     try {
-      const response = await fetch('meetings').then(resp => resp.json());
+      const response = await fetch('asdf').then(resp => resp.json());
       this.meetings = (response as MeetingJson[]).map(m => new Meeting(m));
       this.selectedMeeting = this.meetings[0];
     } catch (e) {

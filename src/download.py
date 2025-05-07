@@ -40,7 +40,7 @@ def download_pdfs() -> None:
             logging.info(f'Skipping "{title}" because it is already in db.')
             continue
 
-        logging.info(f'Downloading agenda for {title}.')
+        logging.info(f'Downloading agenda for "{title}".')
         download_meeting_pdf(event['agendaLink'], when)
 
 

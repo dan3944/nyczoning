@@ -21,7 +21,7 @@ def notify_meetings(args: config.NotifierArgs) -> None:
 
     logging.info(f'Found {len(meetings)} meeting(s) matching the criteria')
     successes = []
-    failures = []
+    failures = {}
 
     for meeting in meetings:
         try:
@@ -30,9 +30,9 @@ def notify_meetings(args: config.NotifierArgs) -> None:
             content = to_html(meeting)
             send_email(args.send, subject, content)
             successes.append(meeting.id)
-        except:
+        except Exception as e:
             logging.exception(f'Failed to send email for meeting_id {meeting.id}')
-            failures.append(meeting.id)
+            failures[meeting.id] = str(e)
 
     with db.Connection() as conn:
         conn.set_notified(successes, True)

@@ -1,4 +1,3 @@
-import bs4
 import datetime as dt
 import fitz
 import io
@@ -7,48 +6,42 @@ import os
 import pandas as pd
 import requests
 import tabula
-from urllib.parse import urlparse
 
 import config
 import db
 
 
 def download_pdfs() -> None:
-    url = 'https://www.nyc.gov/site/planning/about/commission-meetings.page'
+    url = 'https://www.nyc.gov/assets/planning/json/content/calendar/calendar.json'
     logging.info(f'Getting links from {url}')
     resp = requests.get(url)
-    soup = bs4.BeautifulSoup(resp.text, features='lxml')
+    resp.raise_for_status()
 
     with db.Connection() as conn:
         meetings_iso = {
             meeting.when.isoformat() for meeting in conn.list_meetings()
         }
 
-    for section in soup.find_all('div', class_='section'):
-        title = section.find(class_='section-title').text
-        logging.info(f'Found section "{title}"')
+    for event in resp.json():
+        title = event.get('title', '')
 
-        if 'publicmeeting' in ''.join(title.lower().split()):
-            logging.info('Section is a public meeting - searching for link to PDF')
+        if 'publicmeeting' not in ''.join(title.lower().split()):
+            logging.info(f'Skipping "{title}" because it is not a public meeting.')
+            continue
 
-            try:
-                pdf_url = next(
-                    'https://nyc.gov' + link['href']
-                    for link in section.find_all('a', href=True)
-                    if urlparse(link['href']).path.endswith('.pdf')
-                )
-            except StopIteration:
-                logging.info('No PDF found. Skipping this section.')
-                continue
+        if not event.get('agendaLink'):
+            logging.info(f'Skipping "{title}" because it does not have an agenda yet.')
+            continue
 
-            date_text = (section.find(id='PMDATE') or section.find(id='SPMDATE')) \
-                            .find(text=True, recursive=False).strip()
-            when = dt.datetime.strptime(date_text, '%A, %B %d, %Y, %I:%M %p')
+        # e.g. "April 7, 2025 1:00 PM"
+        date_text = '{date} {startTime}'.format(**event)
+        when = dt.datetime.strptime(date_text, '%B %d, %Y %I:%M %p')
+        if when.isoformat() in meetings_iso:
+            logging.info(f'Skipping "{title}" because it is already in db.')
+            continue
 
-            if when.isoformat() in meetings_iso:
-                logging.info(f'Skipping {when} because it is already in db')
-            else:
-                download_meeting_pdf(pdf_url, when)
+        logging.info(f'Downloading agenda for "{title}".')
+        download_meeting_pdf(event['agendaLink'], when)
 
 
 def download_meeting_pdf(pdf_url: str, when: dt.datetime) -> None:

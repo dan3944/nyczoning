@@ -105,9 +105,8 @@ def read_table(pdf_bytes, start_text=None, end_text=None):
 
 
 async def main():
-    async with aiohttp.ClientSession() as session:
-        async with db.Connection() as conn:
-            await Downloader(session, conn).download_pdfs()
+    async with aiohttp.ClientSession() as session, db.Connection() as conn:
+        await Downloader(session, conn).download_pdfs()
 
 
 if __name__ == '__main__':

@@ -84,33 +84,18 @@ class Connection:
         '''Returns the ID of the created meeting.'''
         db_row = when.isoformat(sep=' '), filename, pdf_url
         logging.info(f'Inserting into meetings table: {db_row}')
-        cur = await self._conn.cursor()
-        await cur.execute(
+        result = await self._conn.execute_insert(
             'INSERT INTO meetings (datetime, pdf_filename, pdf_url, notified) VALUES (?, ?, ?, False)',
             db_row)
-        return cur.lastrowid
+        return result['last_insert_rowid()']
 
-    '''
-    id INTEGER PRIMARY KEY,
-    meeting_id INTEGER NOT NULL,
-    is_public_hearing BOOLEAN NOT NULL, -- true = "public hearing", false = "commission votes"
-    ulurp_number TEXT,
-    description TEXT,
-    location TEXT,
-    '''
     async def insert_projects_df(self, df: pd.DataFrame) -> None:
         logging.info(f'Inserting into projects table:\n{df}')
-        insert_sql = '''
+        await self._conn.executemany('''
             INSERT INTO projects
             ( meeting_id,  is_public_hearing,  ulurp_number,  description,  location) VALUES
             (:meeting_id, :is_public_hearing, :ulurp_number, :description, :location);
-        '''
-        params = [
-            # [row['meeting_id'], row['is_public_hearing'], row['ulurp_number'], row['description'], row['location']]
-            row
-            for _, row in df.iterrows()
-        ]
-        await self._conn.executemany(insert_sql, params)
+        ''', df.to_dict(orient='records'))
 
     async def list_meetings(self, id: Optional[int] = None, notified: Optional[bool] = None) -> List[Meeting]:
         where_clause = 'true'
@@ -136,7 +121,7 @@ class Connection:
                     )
                 ) AS projects
             FROM meetings m
-            JOIN projects p on p.meeting_id = m.id
+            LEFT JOIN projects p on p.meeting_id = m.id
             WHERE {where_clause}
             GROUP BY 1, 2, 3
         ''', params)

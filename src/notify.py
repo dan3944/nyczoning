@@ -1,3 +1,4 @@
+import asyncio
 import datetime as dt
 import json
 import logging
@@ -12,10 +13,10 @@ import db
 
 sg = SendGridAPIClient(os.environ.get('SENDGRID_API_KEY'))
 
-def notify_meetings(args: config.NotifierArgs) -> None:
+async def notify_meetings(args: config.NotifierArgs) -> None:
     logging.info('Looking up un-notified meetings')
-    with db.Connection() as conn:
-        meetings = conn.list_meetings(
+    async with db.Connection() as conn:
+        meetings = await conn.list_meetings(
             id=args.meeting_id,
             notified=False if args.meeting_id is None else None)
 
@@ -34,8 +35,8 @@ def notify_meetings(args: config.NotifierArgs) -> None:
             logging.exception(f'Failed to send email for meeting_id {meeting.id}')
             failures[meeting.id] = str(e)
 
-    with db.Connection() as conn:
-        conn.set_notified(successes, True)
+    async with db.Connection() as conn:
+        await conn.set_notified(successes, True)
 
     admin_content = f'Successful meeting_ids: {successes}\nFailed meeting_ids: {failures}'
     if args.send == config.SendType.local:
@@ -144,4 +145,4 @@ def style(styles: Dict[str, str]) -> Tuple[str, str]:
 
 if __name__ == '__main__':
     args = config.parse_args()
-    notify_meetings(args)
+    asyncio.run(notify_meetings(args))

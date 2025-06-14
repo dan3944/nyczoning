@@ -1,11 +1,12 @@
 from __future__ import annotations
+import aiosqlite
+import asyncio
 import datetime as dt
 import json
 import logging
 import os
 import pandas as pd
 import re
-import sqlite3
 from dataclasses import dataclass
 from urllib.parse import urlencode
 from typing import ClassVar, Dict, List, Optional
@@ -69,31 +70,34 @@ class Meeting:
 
 
 class Connection:
-    def __enter__(self):
-        self._conn = sqlite3.connect(os.environ['ZONING_DB_PATH'])
-        self._conn.row_factory = sqlite3.Row
+    async def __aenter__(self):
+        self._conn = await aiosqlite.connect(os.environ['ZONING_DB_PATH'])
+        self._conn.row_factory = aiosqlite.Row
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
         if exc_val is None:
-            self._conn.commit()
-        self._conn.close()
+            await self._conn.commit()
+        await self._conn.close()
 
-    def insert_meeting(self, when: dt.datetime, filename: str, pdf_url: str) -> int:
+    async def insert_meeting(self, when: dt.datetime, filename: str, pdf_url: str) -> int:
         '''Returns the ID of the created meeting.'''
         db_row = when.isoformat(sep=' '), filename, pdf_url
         logging.info(f'Inserting into meetings table: {db_row}')
-        cur = self._conn.cursor()
-        cur.execute(
+        result = await self._conn.execute_insert(
             'INSERT INTO meetings (datetime, pdf_filename, pdf_url, notified) VALUES (?, ?, ?, False)',
             db_row)
-        return cur.lastrowid
+        return result['last_insert_rowid()']
 
-    def insert_projects_df(self, df: pd.DataFrame) -> None:
+    async def insert_projects_df(self, df: pd.DataFrame) -> None:
         logging.info(f'Inserting into projects table:\n{df}')
-        df.to_sql('projects', self._conn, index=False, if_exists='append')
+        await self._conn.executemany('''
+            INSERT INTO projects
+            ( meeting_id,  is_public_hearing,  ulurp_number,  description,  location) VALUES
+            (:meeting_id, :is_public_hearing, :ulurp_number, :description, :location);
+        ''', df.to_dict(orient='records'))
 
-    def list_meetings(self, id: Optional[int] = None, notified: Optional[bool] = None) -> List[Meeting]:
+    async def list_meetings(self, id: Optional[int] = None, notified: Optional[bool] = None) -> List[Meeting]:
         where_clause = 'true'
         params = []
         if id is not None:
@@ -104,8 +108,7 @@ class Connection:
             params.append(notified)
 
         logging.info(f'Listing meetings: "{where_clause}", {params}')
-
-        rows = self._conn.execute(f'''
+        cur = await self._conn.execute(f'''
             SELECT
                 m.id,
                 m.datetime,
@@ -118,25 +121,21 @@ class Connection:
                     )
                 ) AS projects
             FROM meetings m
-            JOIN projects p on p.meeting_id = m.id
+            LEFT JOIN projects p on p.meeting_id = m.id
             WHERE {where_clause}
             GROUP BY 1, 2, 3
-        ''', params).fetchall()
-
+        ''', params)
+        rows = await cur.fetchall()
         return list(map(Meeting.create, rows))
 
-    def set_notified(self, meeting_ids: List[int], notified: bool) -> None:
+    async def set_notified(self, meeting_ids: List[int], notified: bool) -> None:
         logging.info(f'Setting notified to {notified} for meeting_ids {meeting_ids}')
-        self._conn.execute(f'''
+        await self._conn.execute(f'''
             UPDATE meetings
             SET notified = ?
             WHERE id IN ( {','.join('?' * len(meeting_ids))} )
         ''', [notified] + meeting_ids)
 
-    def clear_db(self) -> None:
-        self._conn.execute(f'''
-            DELETE FROM meetings;
-        ''')
-        self._conn.execute(f'''
-            DELETE FROM projects;
-        ''')
+    async def clear_db(self) -> None:
+        await self._conn.execute('DELETE FROM meetings;')
+        await self._conn.execute('DELETE FROM projects;')

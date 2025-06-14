@@ -1,9 +1,13 @@
+import asyncio
 import config
 import download
 import notify
 
 
-if __name__ == '__main__':
+async def main():
     args = config.parse_args()
-    download.download_pdfs()
-    notify.notify_meetings(args)
+    await download.main()
+    await notify.notify_meetings(args)
+
+if __name__ == '__main__':
+    asyncio.run(main())

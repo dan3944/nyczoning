@@ -5,6 +5,5 @@ pandas
 pycryptodome==3.18.0
 PyMuPDF==1.22.5
 requests==2.31.0
-sendgrid==6.10.0
 tabula-py==2.6.0
 yattag==1.15.1

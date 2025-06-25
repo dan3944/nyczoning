@@ -23,8 +23,8 @@ def static_proxy(path) -> flask.Response:
 
 
 @app.route('/meetings')
-def meetings() -> flask.Response:
-    with db.Connection() as conn:
+async def meetings() -> flask.Response:
+    async with db.Connection() as conn:
         meetings = conn.list_meetings()
     meetings.sort(key=lambda meeting: meeting.when, reverse=True)
     return flask.jsonify(list(map(_to_dict, meetings)))

@@ -31,7 +31,7 @@ class Notifier:
 
         emails = [ADMIN]
         if self.args.send == config.SendType.all_contacts:
-            async with self.session.get('https://api.mailjet.com/v3/REST/contactslist/10560183',
+            async with self.session.get('https://api.mailjet.com/v3/REST/contactslist/10560187',
                                         auth=self._mailjet_auth()) as resp:
                 emails = [
                     contact['Address'] + '@lists.mailjet.com'

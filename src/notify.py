@@ -21,8 +21,8 @@ class Notifier:
     async def notify_meetings(self) -> None:
         logging.info('Looking up un-notified meetings')
         meetings = await self.dbconn.list_meetings(
-            id=args.meeting_id,
-            notified=False if args.meeting_id is None else None
+            id=self.args.meeting_id,
+            notified=False if self.args.meeting_id is None else None
         )
 
         logging.info(f'Found {len(meetings)} meeting(s) matching the criteria')

@@ -55,6 +55,8 @@ class Notifier:
             logging.info('resp is None')
             return
 
+        await self.dbconn.set_notified([m.id for m in meetings], True)
+
         statuses = Counter(message.get('Status') for message in resp['Messages'])
         resp = await self._send([{
             'From': {

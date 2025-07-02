@@ -1,80 +1,88 @@
+import aiohttp
 import asyncio
 import datetime as dt
-import json
 import logging
 import os
 import yattag
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail
-from typing import Dict, Tuple
+from collections import Counter
+from typing import Dict, List, Tuple
 
 import config
 import db
 
-sg = SendGridAPIClient(os.environ.get('SENDGRID_API_KEY'))
+ADMIN = 'dccohe@gmail.com'
 
-async def notify_meetings(args: config.NotifierArgs) -> None:
-    logging.info('Looking up un-notified meetings')
-    async with db.Connection() as conn:
-        meetings = await conn.list_meetings(
+class Notifier:
+    def __init__(self, args: config.NotifierArgs, session: aiohttp.ClientSession, dbconn: db.Connection):
+        self.args = args
+        self.session = session
+        self.dbconn = dbconn
+
+    async def notify_meetings(self) -> None:
+        logging.info('Looking up un-notified meetings')
+        meetings = await self.dbconn.list_meetings(
             id=args.meeting_id,
-            notified=False if args.meeting_id is None else None)
+            notified=False if args.meeting_id is None else None
+        )
 
-    logging.info(f'Found {len(meetings)} meeting(s) matching the criteria')
-    successes = []
-    failures = {}
+        logging.info(f'Found {len(meetings)} meeting(s) matching the criteria')
+        if not meetings:
+            return
 
-    for meeting in meetings:
-        try:
-            logging.info(f'Meeting ID: {meeting.id}')
-            subject = f'NYC zoning meeting on {meeting.when:%A, %B %-d}'
-            content = to_html(meeting)
-            send_email(args.send, subject, content)
-            successes.append(meeting.id)
-        except Exception as e:
-            logging.exception(f'Failed to send email for meeting_id {meeting.id}')
-            failures[meeting.id] = str(e)
+        emails = [ADMIN]
+        if self.args.send == config.SendType.all_contacts:
+            async with self.session.get('https://api.mailjet.com/v3/REST/contactslist/10560187',
+                                        auth=self._mailjet_auth()) as resp:
+                emails = [
+                    contact['Address'] + '@lists.mailjet.com'
+                    for contact in (await resp.json())['Data']
+                ]
 
-    async with db.Connection() as conn:
-        await conn.set_notified(successes, True)
+        resp = await self._send([
+            {
+                'From': {
+                    'Email': 'nycplanning@danielthemaniel.com',
+                    'Name': 'NYC Planning Notifications',
+                },
+                'To': [{'Email': email} for email in emails],
+                'Subject': f'NYC zoning meeting on {meeting.when:%A, %B %-d}',
+                'HtmlPart': to_html(meeting),
+            }
+            for meeting in meetings
+        ])
 
-    admin_content = f'Successful meeting_ids: {successes}\nFailed meeting_ids: {failures}'
-    if args.send == config.SendType.local:
-        logging.info(f'Admin info:\n{admin_content}')
-    else:
-        response = sg.send(Mail(
-            from_email='nycplanning@danielthemaniel.com',
-            to_emails='dccohe@gmail.com',
-            subject='nyczoning report',
-            plain_text_content=admin_content,
-        ))
-        logging.info(f'Sent admin email: {response.status_code}')
+        if resp is None:
+            logging.info('resp is None')
+            return
 
+        statuses = Counter(message.get('Status') for message in resp['Messages'])
+        resp = await self._send([{
+            'From': {
+                'Email': 'nycplanning@danielthemaniel.com',
+                'Name': 'NYC Planning Notifications',
+            },
+            'To': [{'Email': ADMIN}],
+            'Subject': 'nyczoning report',
+            'TextPart': f'Message statuses: {statuses}',
+        }])
+        logging.info(f'Sent admin email: {resp}')
 
-def send_email(send_type: config.SendType, subject: str, content: str) -> None:
-    if send_type == config.SendType.local:
-        filename = f'{subject}.html'
-        logging.info(f'Writing to {filename}')
-        with open(filename, 'w') as f:
-            f.write(content)
-        return
+    async def _send(self, messages: List[dict]):
+        if self.args.send == config.SendType.local:
+            for message in messages:
+                filename = f'{message["Subject"]}.html'
+                logging.info(f'Writing to {filename}')
+                with open(filename, 'w') as f:
+                    f.write(message.get('HtmlPart') or message.Get('TextPart'))
+            return
 
-    resp = sg.client.marketing.singlesends.post(request_body={
-        'name': f'NYC zoning notification: {dt.datetime.utcnow().isoformat()}',
-        'send_to': {'all': True}
-                   if send_type == config.SendType.all_contacts
-                   else {'list_ids': ['2f5f6a2e-9a29-4129-aae5-235074f8ab4a']},
-        'email_config': {
-            'subject': subject,
-            'html_content': content,
-            'suppression_group_id': 23496,
-            'sender_id': 5664084,
-        },
-    })
-    ssid = json.loads(resp.body)['id']
-    logging.info(f'Single Send ID: {ssid} (status code: {resp.status_code})')
-    resp = sg.client.marketing.singlesends._(ssid).schedule.put(request_body={'send_at': 'now'})
-    logging.info(f'Scheduled single send (status code: {resp.status_code})')
+        async with self.session.post('https://api.mailjet.com/v3.1/send',
+                                     json={'Messages': messages},
+                                     auth=self._mailjet_auth()) as resp:
+            return await resp.json()
+
+    def _mailjet_auth(self) -> aiohttp.BasicAuth:
+        return aiohttp.BasicAuth(os.environ['MAILJET_APIKEY'], os.environ['MAILJET_SECRET'])
 
 
 def to_html(meeting: db.Meeting) -> str:
@@ -96,8 +104,6 @@ def to_html(meeting: db.Meeting) -> str:
     doc, tag, text, line = yattag.Doc().ttl()
     with tag('html', style({'font-family': 'sans-serif'})):
         with tag('table'):
-            with tag('tr'):
-                line('td', '{{#if first_name}}Hi {{first_name}},{{/if}}')
             with tag('tr'):
                 line('td', f'The NYC planning commission will have a public meeting on {meeting.when:%A, %B %-d at %-I:%M %p}.')
             with tag('tr'):
@@ -143,6 +149,11 @@ def style(styles: Dict[str, str]) -> Tuple[str, str]:
     return ('style', ' '.join(f'{key}: {val};' for key, val in styles.items()))
 
 
+async def main(args: config.NotifierArgs):
+    async with aiohttp.ClientSession() as session, db.Connection() as conn:
+        await Notifier(args, session, conn).notify_meetings()
+
+
 if __name__ == '__main__':
     args = config.parse_args()
-    asyncio.run(notify_meetings(args))
+    asyncio.run(main(args))

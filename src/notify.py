@@ -1,6 +1,5 @@
 import aiohttp
 import asyncio
-import datetime as dt
 import logging
 import os
 import yattag
@@ -32,7 +31,7 @@ class Notifier:
         emails = [ADMIN]
         if self.args.send == config.SendType.all_contacts:
             async with self.session.get('https://api.mailjet.com/v3/REST/contactslist/10560187',
-                                        auth=self._mailjet_auth()) as resp:
+                                        auth=mailjet_auth()) as resp:
                 emails = [
                     contact['Address'] + '@lists.mailjet.com'
                     for contact in (await resp.json())['Data']
@@ -80,11 +79,8 @@ class Notifier:
 
         async with self.session.post('https://api.mailjet.com/v3.1/send',
                                      json={'Messages': messages},
-                                     auth=self._mailjet_auth()) as resp:
+                                     auth=mailjet_auth()) as resp:
             return await resp.json()
-
-    def _mailjet_auth(self) -> aiohttp.BasicAuth:
-        return aiohttp.BasicAuth(os.environ['MAILJET_APIKEY'], os.environ['MAILJET_SECRET'])
 
 
 def to_html(meeting: db.Meeting) -> str:
@@ -149,6 +145,10 @@ def to_html(meeting: db.Meeting) -> str:
 
 def style(styles: Dict[str, str]) -> Tuple[str, str]:
     return ('style', ' '.join(f'{key}: {val};' for key, val in styles.items()))
+
+
+def mailjet_auth() -> aiohttp.BasicAuth:
+    return aiohttp.BasicAuth(os.environ['MAILJET_APIKEY'], os.environ['MAILJET_SECRET'])
 
 
 async def main(args: config.NotifierArgs):

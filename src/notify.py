@@ -3,7 +3,6 @@ import asyncio
 import logging
 import os
 import yattag
-from collections import Counter
 from typing import Dict, List, Tuple
 
 import config
@@ -26,6 +25,7 @@ class Notifier:
 
         logging.info(f'Found {len(meetings)} meeting(s) matching the criteria')
         if not meetings:
+            await self._send_admin(f'meetings: {meetings}')
             return
 
         emails = [ADMIN]
@@ -52,11 +52,11 @@ class Notifier:
 
         if resp is None:
             logging.info('resp is None')
-            return
+        else:
+            await self.dbconn.set_notified([m.id for m in meetings], True)
+            await self._send_admin(f'Messages: {resp["Messages"]}')
 
-        await self.dbconn.set_notified([m.id for m in meetings], True)
-
-        statuses = Counter(message.get('Status') for message in resp['Messages'])
+    async def _send_admin(self, text: str):
         resp = await self._send([{
             'From': {
                 'Email': 'nycplanning@danielthemaniel.com',
@@ -64,7 +64,7 @@ class Notifier:
             },
             'To': [{'Email': ADMIN}],
             'Subject': 'nyczoning report',
-            'TextPart': f'Message statuses: {statuses}',
+            'TextPart': text,
         }])
         logging.info(f'Sent admin email: {resp}')
 

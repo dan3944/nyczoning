@@ -24,62 +24,50 @@ class Notifier:
         )
 
         logging.info(f'Found {len(meetings)} meeting(s) matching the criteria')
-        if not meetings:
-            await self._send_admin(f'meetings: {meetings}')
-            return
+        resps = await asyncio.gather(*map(self._send_meeting, meetings))
 
-        emails = [ADMIN]
-        if self.args.send == config.SendType.all_contacts:
-            async with self.session.get('https://api.mailjet.com/v3/REST/contactslist/10560187',
-                                        auth=mailjet_auth()) as resp:
-                emails = [
-                    contact['Address'] + '@lists.mailjet.com'
-                    for contact in (await resp.json())['Data']
-                ]
-
-        resp = await self._send([
-            {
-                'From': {
-                    'Email': 'nycplanning@danielthemaniel.com',
-                    'Name': 'NYC Planning Notifications',
-                },
-                'To': [{'Email': email} for email in emails],
-                'Subject': f'NYC zoning meeting on {meeting.when:%A, %B %-d}',
-                'HtmlPart': to_html(meeting),
-            }
-            for meeting in meetings
-        ])
-
-        if resp is None:
-            logging.info('resp is None')
-        else:
+        if self.args.send != config.SendType.local:
             await self.dbconn.set_notified([m.id for m in meetings], True)
-            await self._send_admin(f'Messages: {resp["Messages"]}')
+            resp = await self._mailjet_post('v3.1/send', {
+                'Messages': [{
+                    'From': {
+                        'Email': 'nycplanning@danielthemaniel.com',
+                        'Name': 'NYC Planning Notifications',
+                    },
+                    'To': [{'Email': ADMIN}],
+                    'Subject': 'nyczoning report',
+                    'TextPart': str(resps),
+                }],
+            })
+            logging.info(f'Sent admin email: {resp}')
 
-    async def _send_admin(self, text: str):
-        resp = await self._send([{
-            'From': {
-                'Email': 'nycplanning@danielthemaniel.com',
-                'Name': 'NYC Planning Notifications',
-            },
-            'To': [{'Email': ADMIN}],
-            'Subject': 'nyczoning report',
-            'TextPart': text,
-        }])
-        logging.info(f'Sent admin email: {resp}')
+    async def _send_meeting(self, meeting: db.Meeting):
+        subject = f'NYC zoning meeting on {meeting.when:%A, %B %-d}'
+        content = to_html(meeting)
 
-    async def _send(self, messages: List[dict]):
         if self.args.send == config.SendType.local:
-            for message in messages:
-                filename = f'{message["Subject"]}.html'
-                logging.info(f'Writing to {filename}')
-                with open(filename, 'w') as f:
-                    f.write(message.get('HtmlPart') or message.Get('TextPart'))
-            return
+            filename = f'{subject}.html'
+            logging.info(f'Writing to {filename}')
+            with open(filename, 'w') as f:
+                f.write(content)
+            return {'file': filename}
 
-        async with self.session.post('https://api.mailjet.com/v3.1/send',
-                                     json={'Messages': messages},
-                                     auth=mailjet_auth()) as resp:
+        draft_id = (await self._mailjet_post('v3/REST/campaigndraft', {
+            'Locale': 'en_US',
+            'Sender': 'NYC Planning Notifications',
+            'SenderEmail': 'nycplanning@danielthemaniel.com',
+            'Subject': subject,
+            'ContactsListID':
+                '10560187' if self.args.send == config.SendType.all_contacts
+                else '10560183',
+        }))['Data'][0]['ID']
+        await self._mailjet_post(f'v3/REST/campaigndraft/{draft_id}/detailcontent', {'Html-part': content})
+        return await self._mailjet_post(f'v3/REST/campaigndraft/{draft_id}/send', {})
+
+    async def _mailjet_post(self, url: str, content: dict) -> dict:
+        url = os.path.join('https://api.mailjet.com', url)
+        async with self.session.post(url, json=content, auth=mailjet_auth()) as resp:
+            resp.raise_for_status()
             return await resp.json()
 
 
@@ -139,6 +127,9 @@ def to_html(meeting: db.Meeting) -> str:
                     with tag('tbody'):
                         with tag('tr'):
                             line('td', 'None found', cell_style(100))
+
+        line('a', 'Click here to unsubscribe', ('href', '[[UNSUB_LINK]]'), ('target', '_blank'))
+
 
     return doc.getvalue()
 

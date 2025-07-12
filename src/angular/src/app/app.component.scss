@@ -1,15 +1,96 @@
-.divider {
-    height: 100vh;
-    width: 1.5rem;
-    background-color: rgba(0, 0, 0, .1);
-    box-shadow: inset 0 .125em .5em rgba(0, 0, 0, .1);
+@use '@angular/material' as mat;
+
+h1, h2, h3 {
+    margin: 0;
 }
 
-.iframe-container {
+a {
+    color: mat.get-color-from-palette(mat.$blue-palette, 600);
     width: fit-content;
+    text-decoration: none;
+}
 
-    iframe {
-        height: 540px;
-        width: 580px;
+.error {
+    color: mat.get-color-from-palette(mat.$red-palette, 600);
+}
+
+.container {
+    display: flex;
+}
+
+mat-expansion-panel {
+    overflow: unset;
+
+    ::ng-deep .mat-expansion-panel-body {
+        padding: 0;
+        overflow: hidden;
+    }
+}
+
+.icon-with-text {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.left-panel {
+    display: flex;
+    flex-direction: column;
+    min-width: max-content;
+    height: 100vh;
+    border-right: 1px solid black;
+
+    h2 {
+        padding: 1rem;
+    }
+
+    mat-action-list {
+        overflow-y: auto;
+        width: 100%;
+
+        .selected {
+            background: mat.get-color-from-palette(mat.$blue-palette, 700);
+        }
+
+        button {
+            height: 4rem;
+            border-top: 1px solid mat.get-color-from-palette(mat.$grey-palette, 500);
+        }
+
+        .top {
+            display: flex;
+            margin-bottom: 0;
+
+            .past, .upcoming {
+                margin-left: auto;
+            }
+
+            .upcoming {
+                color: mat.get-color-from-palette(mat.$yellow-palette, 800);
+            }
+        }
+    }
+}
+
+.main-content {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow-y: auto;
+    box-sizing: border-box;
+    padding: 1rem;
+    gap: 0.5rem;
+
+    table {
+        border-top: 1px solid mat.get-color-from-palette(mat.$grey-palette, 500);
+
+        .mat-column-description {
+            width: 60%;
+        }
+
+        td {
+            padding-top: 0.5rem;
+            padding-bottom: 0.5rem;
+        }
     }
 }

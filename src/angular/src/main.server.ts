@@ -1,11 +1,11 @@
-import { bootstrapApplication, provideClientHydration } from '@angular/platform-browser';
-import { provideServerRendering } from '@angular/platform-server';
+import { bootstrapApplication } from '@angular/platform-browser';
+import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
 import { AppComponent } from './app/app.component';
+
 
 const bootstrap = () => bootstrapApplication(AppComponent, {
     providers: [
-        provideClientHydration(),
-        provideServerRendering(),
+        provideAnimationsAsync(),
     ]
 });
 

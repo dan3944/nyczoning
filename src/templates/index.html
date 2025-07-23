@@ -18,19 +18,9 @@
             animation: marquee 15s linear infinite;
         }
 
-        .reverse-marquee {
-            overflow: hidden;
-            animation: reverse-marquee 15s linear infinite;
-        }
-
         @keyframes marquee {
             0%   { transform: translatex(0%); }
             100% { transform: translatex(-100%); }
-        }
-
-        @keyframes reverse-marquee {
-            0%   { transform: translatex(-100%); }
-            100% { transform: translatex(0%); }
         }
 
         #nycplanning {

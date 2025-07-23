@@ -54,7 +54,7 @@ class Downloader:
         logging.info(f'Dowloading pdf from {pdf_url}')
         async with self.session.get(pdf_url) as resp:
             pdf_bytes = await resp.read()
-        filename = f'src/static/{when.isoformat(sep=" ")}.pdf'
+        filename = f'src/static/nycplanning/{when.isoformat(sep=" ")}.pdf'
 
         logging.info(f'Saving pdf to {filename}')
         os.makedirs('pdfs', exist_ok=True)

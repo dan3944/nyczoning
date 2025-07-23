@@ -32,7 +32,7 @@ async def meetings() -> flask.Response:
 
 def _to_dict(meeting: db.Meeting) -> dict:
     d = dataclasses.asdict(meeting)
-    d['pdf_path'] = f'/static/{meeting.when.isoformat(sep=" ")}.pdf'
+    d['pdf_path'] = f'/static/nycplanning/{meeting.when.isoformat(sep=" ")}.pdf'
     d['gcal_link'] = meeting.gcal_link()
     for project in d['projects']:
         project['description'] = project['description'].replace('\r', ' ')

@@ -3,7 +3,6 @@ import asyncio
 import logging
 import os
 import yattag
-from typing import Dict, List, Tuple
 
 import config
 import db
@@ -26,24 +25,26 @@ class Notifier:
         logging.info(f'Found {len(meetings)} meeting(s) matching the criteria')
         resps = await asyncio.gather(*map(self._send_meeting, meetings))
 
-        if self.args.send != config.SendType.local:
-            await self.dbconn.set_notified([m.id for m in meetings], True)
-            resp = await self._mailjet_post('v3.1/send', {
-                'Messages': [{
-                    'From': {
-                        'Email': 'nycplanning@danielthemaniel.com',
-                        'Name': 'NYC Planning Notifications',
-                    },
-                    'To': [{'Email': ADMIN}],
-                    'Subject': 'nyczoning report',
-                    'TextPart': str(resps),
-                }],
-            })
-            logging.info(f'Sent admin email: {resp}')
+        if self.args.send == config.SendType.local:
+            return
+
+        await self.dbconn.set_notified([m.id for m in meetings], True)
+        resp = await self._mailjet_post('v3.1/send', {
+            'Messages': [{
+                'From': {
+                    'Email': 'nycplanning@danielthemaniel.com',
+                    'Name': 'NYC Planning Notifications',
+                },
+                'To': [{'Email': ADMIN}],
+                'Subject': 'nyczoning report',
+                'TextPart': str(resps),
+            }],
+        })
+        logging.info(f'Sent admin email: {resp}')
 
     async def _send_meeting(self, meeting: db.Meeting):
         subject = f'NYC zoning meeting on {meeting.when:%A, %B %-d}'
-        content = to_html(meeting)
+        content = _to_html(meeting)
 
         if self.args.send == config.SendType.local:
             filename = f'{subject}.html'
@@ -66,29 +67,30 @@ class Notifier:
 
     async def _mailjet_post(self, url: str, content: dict) -> dict:
         url = os.path.join('https://api.mailjet.com', url)
-        async with self.session.post(url, json=content, auth=mailjet_auth()) as resp:
+        auth = aiohttp.BasicAuth(os.environ['MAILJET_APIKEY'], os.environ['MAILJET_SECRET'])
+        async with self.session.post(url, json=content, auth=auth) as resp:
             resp.raise_for_status()
             return await resp.json()
 
 
-def to_html(meeting: db.Meeting) -> str:
-    table_style = style({
+def _to_html(meeting: db.Meeting) -> str:
+    table_style = _style({
         'border-collapse': 'collapse',
         'border': '1px solid black',
         'table-layout': 'fixed',
         'margin-top': '20px'})
-    header_style = style({
+    header_style = _style({
         'font-size': '14pt',
         'padding': '16px 8px',
         'border': '1px solid black'})
-    cell_style = lambda width: style({
+    cell_style = lambda width: _style({
         'font-size': '11pt',
         'padding': '16px 8px',
         'border': '1px solid black',
         'width': f'{width}%'})
 
     doc, tag, text, line = yattag.Doc().ttl()
-    with tag('html', style({'font-family': 'sans-serif'})):
+    with tag('html', _style({'font-family': 'sans-serif'})):
         with tag('table'):
             with tag('tr'):
                 line('td', f'The NYC planning commission will have a public meeting on {meeting.when:%A, %B %-d at %-I:%M %p}.')
@@ -128,18 +130,14 @@ def to_html(meeting: db.Meeting) -> str:
                         with tag('tr'):
                             line('td', 'None found', cell_style(100))
 
+        # Mailjet automatically replaces [[UNSUB_LINK]] with an unsubscribe link.
         line('a', 'Click here to unsubscribe', ('href', '[[UNSUB_LINK]]'), ('target', '_blank'))
-
 
     return doc.getvalue()
 
 
-def style(styles: Dict[str, str]) -> Tuple[str, str]:
+def _style(styles: dict[str, str]) -> tuple[str, str]:
     return ('style', ' '.join(f'{key}: {val};' for key, val in styles.items()))
-
-
-def mailjet_auth() -> aiohttp.BasicAuth:
-    return aiohttp.BasicAuth(os.environ['MAILJET_APIKEY'], os.environ['MAILJET_SECRET'])
 
 
 async def main(args: config.NotifierArgs):

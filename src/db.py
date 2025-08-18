@@ -119,7 +119,7 @@ class Connection:
                         'location', p.location,
                         'is_public_hearing', p.is_public_hearing
                     )
-                ) AS projects
+                ) filter (where p.location is not null) AS projects
             FROM meetings m
             LEFT JOIN projects p on p.meeting_id = m.id
             WHERE {where_clause}

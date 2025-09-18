@@ -35,7 +35,9 @@ class Downloader:
                 logging.info(f'Skipping "{title}" because it is not a public meeting.')
                 continue
 
-            if not event.get('agendaLink'):
+            pdf_url = event.get('agendaLink') or event.get('calendarLink')
+
+            if not pdf_url:
                 logging.info(f'Skipping "{title}" because it does not have an agenda yet.')
                 continue
 
@@ -46,12 +48,12 @@ class Downloader:
                 logging.info(f'Skipping "{title}" because it is already in db.')
                 continue
 
-            pdf_downloads.append(self.download_meeting_pdf(event['agendaLink'], when))
+            pdf_downloads.append(self.download_meeting_pdf(pdf_url, when))
 
         await asyncio.gather(*pdf_downloads)
 
     async def download_meeting_pdf(self, pdf_url: str, when: dt.datetime) -> None:
-        logging.info(f'Dowloading pdf from {pdf_url}')
+        logging.info(f'Downloading pdf from {pdf_url}')
         async with self.session.get(pdf_url) as resp:
             pdf_bytes = await resp.read()
         filename = f'src/static/nycplanning/{when.isoformat(sep=" ")}.pdf'
